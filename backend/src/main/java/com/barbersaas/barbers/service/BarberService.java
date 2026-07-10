@@ -10,6 +10,10 @@ import com.barbersaas.barberschedules.entity.BarberScheduleEntity;
 import com.barbersaas.barberschedules.repository.BarberScheduleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.barbersaas.weeklyschedule.repository.WeeklyScheduleRepository;
+import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
+import java.time.DayOfWeek;
+import java.util.ArrayList;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,14 +26,17 @@ public class BarberService {
     private final BarberRepository barberRepository;
     private final BarberMapper barberMapper;
     private final BarberScheduleRepository barberScheduleRepository;
+    private final WeeklyScheduleRepository weeklyScheduleRepository;
 
     public BarberService(
-            BarberRepository barberRepository, 
+            BarberRepository barberRepository,
             BarberMapper barberMapper,
-            BarberScheduleRepository barberScheduleRepository) {
+            BarberScheduleRepository barberScheduleRepository,
+            WeeklyScheduleRepository weeklyScheduleRepository) {
         this.barberRepository = barberRepository;
         this.barberMapper = barberMapper;
         this.barberScheduleRepository = barberScheduleRepository;
+        this.weeklyScheduleRepository = weeklyScheduleRepository;
     }
 
     public BarberResponse create(CreateBarberRequest request) {
@@ -91,12 +98,31 @@ public class BarberService {
                     5    // defaultBreakMinutes padrão
             );
             System.out.println(">>> Criando agenda para barbeiro: " + barber.getId());
-            barberScheduleRepository.save(defaultSchedule);
+            BarberScheduleEntity savedSchedule = barberScheduleRepository.save(defaultSchedule);
             System.out.println(">>> Agenda salva.");
             System.out.println(
                     "Encontrou logo após salvar? " +
                             barberScheduleRepository.findByBarberId(barber.getId()).isPresent()
             );
+            
+            createDefaultWeeklySchedule(savedSchedule);
         }
+    }
+
+    private void createDefaultWeeklySchedule(BarberScheduleEntity barberSchedule) {
+        List<WeeklyScheduleEntity> weeklySchedules = new ArrayList<>();
+        
+        for (DayOfWeek dayOfWeek : DayOfWeek.values()) {
+            WeeklyScheduleEntity weeklySchedule = new WeeklyScheduleEntity(
+                    barberSchedule,
+                    dayOfWeek,
+                    null,
+                    null,
+                    false
+            );
+            weeklySchedules.add(weeklySchedule);
+        }
+        
+        weeklyScheduleRepository.saveAll(weeklySchedules);
     }
 }
