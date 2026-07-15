@@ -1,0 +1,62 @@
+package com.barbersaas.scheduleblock.dto;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+import java.time.LocalDateTime;
+
+public class UpdateScheduleBlockRequest {
+
+    @NotNull
+    private LocalDateTime startDateTime;
+
+    @NotNull
+    private LocalDateTime endDateTime;
+
+    @Size(max = 255)
+    private String reason;
+
+    public UpdateScheduleBlockRequest() {
+    }
+
+    public UpdateScheduleBlockRequest(
+             LocalDateTime startDateTime, 
+             LocalDateTime endDateTime, 
+             String reason) {
+        this.startDateTime = startDateTime;
+        this.endDateTime = endDateTime;
+        this.reason = reason; }
+
+    public LocalDateTime getStartDateTime() {
+        return startDateTime;
+    }
+
+    public void setStartDateTime(LocalDateTime startDateTime) {
+        this.startDateTime = startDateTime;
+    }
+
+    public LocalDateTime getEndDateTime() {
+        return endDateTime;
+    }
+
+    public void setEndDateTime(LocalDateTime endDateTime) {
+        this.endDateTime = endDateTime;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    @Override
+    public String toString() {
+        return "UpdateScheduleBlockRequest{" +
+                "startDateTime=" + startDateTime +
+                ", endDateTime=" + endDateTime +
+                ", reason='" + reason + '\'' +
+                '}';
+    }
+}
