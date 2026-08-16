@@ -1,0 +1,11 @@
+{
+  "name": "Jhow Cortes",
+  "short_name": "Jhow Cortes",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "description": "Barber shop scheduling app.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false
+}
