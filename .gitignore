@@ -37,3 +37,8 @@ backend/build/
 ### VS Code ###
 backend/.vscode/
 .DS_Store
+
+### Local / Generated ###
+graphify-out/
+frontend/macos/DerivedData/
+frontend/.ai/
