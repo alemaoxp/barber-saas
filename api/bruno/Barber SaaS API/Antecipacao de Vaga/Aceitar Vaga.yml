@@ -1,0 +1,21 @@
+info:
+  name: Aceitar Vaga
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: http://localhost:8080/api/v1/customers/{{customerId}}/availability-interests/{{interestId}}/accept
+  body:
+    type: json
+    data: |-
+      {
+        "availableSlotId": "{{availableSlotId}}"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

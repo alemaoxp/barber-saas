@@ -8,5 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface CustomerRepository extends JpaRepository<CustomerEntity, UUID> {
-    // No custom methods for now
+    java.util.Optional<CustomerEntity> findByPhone(String phone);
 }

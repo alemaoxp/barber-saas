@@ -2,6 +2,8 @@ package com.barbersaas.scheduleblock.service;
 
 import com.barbersaas.barberschedules.entity.BarberScheduleEntity;
 import com.barbersaas.barberschedules.repository.BarberScheduleRepository;
+import com.barbersaas.exception.BusinessException;
+import com.barbersaas.exception.NotFoundException;
 import com.barbersaas.scheduleblock.dto.CreateScheduleBlockRequest;
 import com.barbersaas.scheduleblock.dto.ScheduleBlockResponse;
 import com.barbersaas.scheduleblock.dto.UpdateScheduleBlockRequest;
@@ -10,6 +12,9 @@ import com.barbersaas.scheduleblock.mapper.ScheduleBlockMapper;
 import com.barbersaas.scheduleblock.repository.ScheduleBlockRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,13 +37,65 @@ public class ScheduleBlockService {
 
     private BarberScheduleEntity findBarberSchedule(UUID barberId) {
         return barberScheduleRepository.findByBarberId(barberId)
-                .orElseThrow(() -> new RuntimeException("Barber schedule not found."));
+                .orElseThrow(() -> new NotFoundException("Agenda do barbeiro não encontrada."));
     }
 
     private ScheduleBlockEntity findScheduleBlock(UUID scheduleBlockId, BarberScheduleEntity barberSchedule) {
         return scheduleBlockRepository
                 .findByIdAndBarberSchedule(scheduleBlockId, barberSchedule)
-                .orElseThrow(() -> new RuntimeException("Schedule block not found."));
+                .orElseThrow(() -> new NotFoundException("Bloqueio de agenda não encontrado."));
+    }
+
+    public void validateNotBlocked(UUID barberId, LocalDateTime appointmentDateTime) {
+        BarberScheduleEntity barberSchedule = findBarberSchedule(barberId);
+        
+        boolean isBlocked = scheduleBlockRepository.existsByBarberScheduleAndStartDateTimeLessThanEqualAndEndDateTimeGreaterThan(
+            barberSchedule,
+            appointmentDateTime,
+            appointmentDateTime
+        );
+        
+        if (isBlocked) {
+            throw new BusinessException("Horário bloqueado.");
+        }
+    }
+
+
+
+    public void validateIntervalNotBlocked(
+            UUID barberId,
+            LocalDateTime startDateTime,
+            int durationMinutes) {
+
+        BarberScheduleEntity barberSchedule =
+                findBarberSchedule(barberId);
+
+        LocalDateTime endDateTime =
+                startDateTime.plusMinutes(durationMinutes);
+
+        boolean isBlocked =
+                scheduleBlockRepository
+                        .existsByBarberScheduleAndStartDateTimeLessThanAndEndDateTimeGreaterThan(
+                                barberSchedule,
+                                endDateTime,
+                                startDateTime
+                        );
+
+        if (isBlocked) {
+            throw new BusinessException(
+                    "O horário do serviço está bloqueado."
+            );
+        }
+    }
+
+    public List<ScheduleBlockEntity> findBlocksByDate(UUID barberId, LocalDate date) {
+        BarberScheduleEntity barberSchedule = findBarberSchedule(barberId);
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+        
+        return scheduleBlockRepository.findByBarberScheduleAndStartDateTimeBetween(
+            barberSchedule, startOfDay, endOfDay
+        );
     }
 
     public ScheduleBlockResponse create(UUID barberId, CreateScheduleBlockRequest request) {

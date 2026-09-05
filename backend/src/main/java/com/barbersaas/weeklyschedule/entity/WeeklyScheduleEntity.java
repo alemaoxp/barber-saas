@@ -40,6 +40,12 @@ public class WeeklyScheduleEntity {
     @Column(name = "end_time")
     private LocalTime endTime;
 
+    @Column(name = "break_start_time")
+    private LocalTime breakStartTime;
+
+    @Column(name = "break_end_time")
+    private LocalTime breakEndTime;
+
     @Column(name = "working_day", nullable = false)
     private boolean workingDay;
 
@@ -69,7 +75,7 @@ public class WeeklyScheduleEntity {
 
     public void setBarberSchedule(BarberScheduleEntity barberSchedule) {
         this.barberSchedule = barberSchedule;
-}
+    }
 
     public DayOfWeek getDayOfWeek() {
         return dayOfWeek;
@@ -95,6 +101,22 @@ public class WeeklyScheduleEntity {
         this.endTime = endTime;
     }
 
+    public LocalTime getBreakStartTime() {
+        return breakStartTime;
+    }
+
+    public void setBreakStartTime(LocalTime breakStartTime) {
+        this.breakStartTime = breakStartTime;
+    }
+
+    public LocalTime getBreakEndTime() {
+        return breakEndTime;
+    }
+
+    public void setBreakEndTime(LocalTime breakEndTime) {
+        this.breakEndTime = breakEndTime;
+    }
+
     public boolean isWorkingDay() {
         return workingDay;
     }
@@ -110,6 +132,8 @@ public class WeeklyScheduleEntity {
                 ", dayOfWeek=" + dayOfWeek +
                 ", startTime=" + startTime +
                 ", endTime=" + endTime +
+                ", breakStartTime=" + breakStartTime +
+                ", breakEndTime=" + breakEndTime +
                 ", workingDay=" + workingDay +
                 '}';
     }

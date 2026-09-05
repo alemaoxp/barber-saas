@@ -1,0 +1,15 @@
+info:
+  name: Buscar Interesse
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: http://localhost:8080/api/v1/customers/{{customerId}}/availability-interests/{{interestId}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

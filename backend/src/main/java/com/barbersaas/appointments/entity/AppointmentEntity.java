@@ -5,10 +5,8 @@ import com.barbersaas.barbers.entity.BarberEntity;
 import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.services.entity.ServiceEntity;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -19,33 +17,33 @@ public class AppointmentEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @NotNull(message = "Cliente é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)
     private CustomerEntity customer;
 
-    @NotNull(message = "Barbeiro é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "barber_id", nullable = false)
     private BarberEntity barber;
 
-    @NotNull(message = "Serviço é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
 
-    @NotNull(message = "Data é obrigatória")
-    @Column(nullable = false)
-    private LocalDate date;
+    @Column(name = "appointment_date_time", nullable = false)
+    private LocalDateTime appointmentDateTime;
 
-    @NotNull(message = "Horário é obrigatório")
-    @Column(nullable = false)
-    private LocalTime time;
-
-    @NotNull(message = "Status é obrigatório")
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     private AppointmentStatus status;
+
+    @Column(name = "notes", length = 255)
+    private String notes;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "cancel_token", length = 64, unique = true)
+    private String cancelToken;
 
     public AppointmentEntity() {
     }
@@ -54,20 +52,24 @@ public class AppointmentEntity {
             CustomerEntity customer,
             BarberEntity barber,
             ServiceEntity service,
-            LocalDate date,
-            LocalTime time,
-            AppointmentStatus status
-    ) {
+            LocalDateTime appointmentDateTime,
+            AppointmentStatus status,
+            String notes) {
         this.customer = customer;
         this.barber = barber;
         this.service = service;
-        this.date = date;
-        this.time = time;
+        this.appointmentDateTime = appointmentDateTime;
         this.status = status;
+        this.notes = notes;
+        this.createdAt = LocalDateTime.now();
     }
 
     public UUID getId() {
         return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
     }
 
     public CustomerEntity getCustomer() {
@@ -94,20 +96,12 @@ public class AppointmentEntity {
         this.service = service;
     }
 
-    public LocalDate getDate() {
-        return date;
+    public LocalDateTime getAppointmentDateTime() {
+        return appointmentDateTime;
     }
 
-    public void setDate(LocalDate date) {
-        this.date = date;
-    }
-
-    public LocalTime getTime() {
-        return time;
-    }
-
-    public void setTime(LocalTime time) {
-        this.time = time;
+    public void setAppointmentDateTime(LocalDateTime appointmentDateTime) {
+        this.appointmentDateTime = appointmentDateTime;
     }
 
     public AppointmentStatus getStatus() {
@@ -118,13 +112,39 @@ public class AppointmentEntity {
         this.status = status;
     }
 
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getCancelToken() {
+        return cancelToken;
+    }
+
+    public void setCancelToken(String cancelToken) {
+        this.cancelToken = cancelToken;
+    }
+
     @Override
     public String toString() {
         return "AppointmentEntity{" +
                 "id=" + id +
-                ", date=" + date +
-                ", time=" + time +
+                ", appointmentDateTime=" + appointmentDateTime +
                 ", status=" + status +
+                ", notes='" + notes + '\'' +
+                ", createdAt=" + createdAt +
+                ", cancelToken='" + cancelToken + '\'' +
                 '}';
     }
 }

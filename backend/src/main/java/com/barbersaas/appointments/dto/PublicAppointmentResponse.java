@@ -5,7 +5,7 @@ import com.barbersaas.appointments.enums.AppointmentStatus;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-public class AppointmentResponse {
+public class PublicAppointmentResponse {
 
     private UUID id;
     private UUID customerId;
@@ -14,18 +14,20 @@ public class AppointmentResponse {
     private AppointmentStatus status;
     private String notes;
     private LocalDateTime createdAt;
+    private String cancelToken;
 
-    public AppointmentResponse() {
+    public PublicAppointmentResponse() {
     }
 
-    public AppointmentResponse(
+    public PublicAppointmentResponse(
             UUID id,
             UUID customerId,
             UUID serviceId,
             LocalDateTime appointmentDateTime,
             AppointmentStatus status,
             String notes,
-            LocalDateTime createdAt) {
+            LocalDateTime createdAt,
+            String cancelToken) {
         this.id = id;
         this.customerId = customerId;
         this.serviceId = serviceId;
@@ -33,6 +35,7 @@ public class AppointmentResponse {
         this.status = status;
         this.notes = notes;
         this.createdAt = createdAt;
+        this.cancelToken = cancelToken;
     }
 
     public UUID getId() {
@@ -74,6 +77,7 @@ public class AppointmentResponse {
     public void setStatus(AppointmentStatus status) {
         this.status = status;
     }
+
     public String getNotes() {
         return notes;
     }
@@ -90,16 +94,11 @@ public class AppointmentResponse {
         this.createdAt = createdAt;
     }
 
-    @Override
-    public String toString() {
-        return "AppointmentResponse{" +
-                "id=" + id +
-                ", customerId=" + customerId +
-                ", serviceId=" + serviceId +
-                ", appointmentDateTime=" + appointmentDateTime +
-                ", status=" + status +
-                ", notes='" + notes + '\'' +
-                ", createdAt=" + createdAt +
-                '}';
+    public String getCancelToken() {
+        return cancelToken;
+    }
+
+    public void setCancelToken(String cancelToken) {
+        this.cancelToken = cancelToken;
     }
 }

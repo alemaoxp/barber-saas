@@ -1,47 +1,41 @@
 package com.barbersaas.appointments.dto;
 
-import com.barbersaas.appointments.enums.AppointmentStatus;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public class CreateAppointmentRequest {
 
-    @NotNull(message = "ID do cliente é obrigatório")
+    @NotNull
     private UUID customerId;
 
-    @NotNull(message = "ID do barbeiro é obrigatório")
-    private UUID barberId;
-
-    @NotNull(message = "ID do serviço é obrigatório")
+    @NotNull
     private UUID serviceId;
 
-    @NotNull(message = "Data é obrigatória")
-    private LocalDate date;
+    @NotNull
+    private LocalDateTime appointmentDateTime;
 
-    @NotNull(message = "Horário é obrigatório")
-    private LocalTime time;
+    @Size(max = 255)
+    private String notes;
 
-    @NotNull(message = "Status é obrigatório")
-    private AppointmentStatus status;
+    public CreateAppointmentRequest() {
+    }
 
-    // Getters and Setters
+    public CreateAppointmentRequest(UUID customerId, UUID serviceId, LocalDateTime appointmentDateTime, String notes) {
+        this.customerId = customerId;
+        this.serviceId = serviceId;
+        this.appointmentDateTime = appointmentDateTime;
+        this.notes = notes;
+    }
+
     public UUID getCustomerId() {
         return customerId;
     }
 
     public void setCustomerId(UUID customerId) {
         this.customerId = customerId;
-    }
-
-    public UUID getBarberId() {
-        return barberId;
-    }
-
-    public void setBarberId(UUID barberId) {
-        this.barberId = barberId;
     }
 
     public UUID getServiceId() {
@@ -52,27 +46,29 @@ public class CreateAppointmentRequest {
         this.serviceId = serviceId;
     }
 
-    public LocalDate getDate() {
-        return date;
+    public LocalDateTime getAppointmentDateTime() {
+        return appointmentDateTime;
     }
 
-    public void setDate(LocalDate date) {
-        this.date = date;
+    public void setAppointmentDateTime(LocalDateTime appointmentDateTime) {
+        this.appointmentDateTime = appointmentDateTime;
     }
 
-    public LocalTime getTime() {
-        return time;
+    public String getNotes() {
+        return notes;
     }
 
-    public void setTime(LocalTime time) {
-        this.time = time;
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
-    public AppointmentStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(AppointmentStatus status) {
-        this.status = status;
+    @Override
+    public String toString() {
+        return "CreateAppointmentRequest{" +
+                "customerId=" + customerId +
+                ", serviceId=" + serviceId +
+                ", appointmentDateTime=" + appointmentDateTime +
+                ", notes='" + notes + '\'' +
+                '}';
     }
 }

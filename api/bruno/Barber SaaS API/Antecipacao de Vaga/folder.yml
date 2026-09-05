@@ -1,0 +1,7 @@
+info:
+  name: Antecipacao de Vaga
+  type: folder
+  seq: 7
+
+request:
+  auth: inherit

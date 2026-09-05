@@ -13,23 +13,31 @@ public class WeeklyScheduleMapper {
 
     public WeeklyScheduleResponse toResponse(List<WeeklyScheduleEntity> entities) {
         List<WeeklyScheduleDayDto> weeklySchedule = new ArrayList<>();
-        
+
         for (WeeklyScheduleEntity entity : entities) {
             WeeklyScheduleDayDto dto = new WeeklyScheduleDayDto(
                     entity.getDayOfWeek(),
                     entity.isWorkingDay(),
                     entity.getStartTime(),
-                    entity.getEndTime()
+                    entity.getEndTime(),
+                    entity.getBreakStartTime(),
+                    entity.getBreakEndTime()
             );
+
             weeklySchedule.add(dto);
         }
-        
+
         return new WeeklyScheduleResponse(weeklySchedule);
     }
 
-    public void updateEntity(WeeklyScheduleEntity entity, WeeklyScheduleDayDto dto) {
+    public void updateEntity(
+            WeeklyScheduleEntity entity,
+            WeeklyScheduleDayDto dto) {
+
         entity.setWorkingDay(dto.isWorkingDay());
         entity.setStartTime(dto.getStartTime());
         entity.setEndTime(dto.getEndTime());
+        entity.setBreakStartTime(dto.getBreakStartTime());
+        entity.setBreakEndTime(dto.getBreakEndTime());
     }
 }

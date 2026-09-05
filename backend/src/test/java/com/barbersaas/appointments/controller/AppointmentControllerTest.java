@@ -86,7 +86,8 @@ class AppointmentControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.customerId", is(CUSTOMER_ID.toString())))
                 .andExpect(jsonPath("$.serviceId", is(SERVICE_ID.toString())))
-                .andExpect(jsonPath("$.status", is("SCHEDULED")));
+                .andExpect(jsonPath("$.status", is("SCHEDULED")))
+                .andExpect(jsonPath("$.cancelToken").doesNotExist());
     }
 
     @Test

@@ -1,10 +1,12 @@
 package com.barbersaas.appointments.service;
 
 import com.barbersaas.appointments.dto.CreateAppointmentRequest;
+import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
 import com.barbersaas.appointments.enums.AppointmentStatus;
 import com.barbersaas.appointments.mapper.AppointmentMapper;
 import com.barbersaas.appointments.repository.AppointmentRepository;
+import com.barbersaas.availableslot.service.AvailableSlotService;
 import com.barbersaas.barbers.entity.BarberEntity;
 import com.barbersaas.barbers.repository.BarberRepository;
 import com.barbersaas.customers.entity.CustomerEntity;
@@ -34,6 +36,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -52,6 +55,8 @@ class AppointmentServiceTest {
             UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID SERVICE_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private static final UUID APPOINTMENT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000004");
 
     @Mock
     private AppointmentRepository appointmentRepository;
@@ -71,6 +76,9 @@ class AppointmentServiceTest {
     @Mock
     private WeeklyScheduleService weeklyScheduleService;
 
+    @Mock
+    private AvailableSlotService availableSlotService;
+
     private AppointmentService appointmentService;
     private BarberEntity barber;
     private CustomerEntity customer;
@@ -85,7 +93,8 @@ class AppointmentServiceTest {
                 serviceRepository,
                 new AppointmentMapper(),
                 scheduleBlockService,
-                weeklyScheduleService
+                weeklyScheduleService,
+                availableSlotService
         );
 
         barber = barber();
@@ -222,6 +231,41 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void updateShouldIgnoreOwnAppointmentWhenCheckingConflicts() {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
+        AppointmentEntity appointment =
+                existingAppointment(
+                        dateTime,
+                        40,
+                        AppointmentStatus.SCHEDULED
+                );
+        ReflectionTestUtils.setField(appointment, "id", APPOINTMENT_ID);
+
+        when(appointmentRepository.findByIdAndBarberId(
+                APPOINTMENT_ID,
+                BARBER_ID
+        )).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(dateTime.minusHours(8)),
+                eq(dateTime.plusMinutes(40))
+        )).thenReturn(List.of(appointment));
+
+        assertDoesNotThrow(
+                () -> appointmentService.update(
+                        BARBER_ID,
+                        APPOINTMENT_ID,
+                        new UpdateAppointmentRequest(
+                                CUSTOMER_ID,
+                                SERVICE_ID,
+                                dateTime,
+                                "teste"
+                        )
+                )
+        );
+    }
+
+    @Test
     void scheduleBlockConflictShouldBeRejected() {
         LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
         doThrow(new BusinessException("O horário do serviço está bloqueado."))
@@ -240,6 +284,78 @@ class AppointmentServiceTest {
     @Test
     void timeOutsideScheduleBlockShouldBeAllowed() {
         assertCreateAllowed(LocalDateTime.of(2026, 9, 2, 11, 0));
+    }
+
+    @Test
+    void publicCreateShouldReturnCancelToken() {
+        LocalDateTime dateTime =
+                LocalDateTime.of(2026, 9, 2, 11, 0);
+
+        assertNotNull(
+                appointmentService.createPublic(
+                                BARBER_ID,
+                                new CreateAppointmentRequest(
+                                        CUSTOMER_ID,
+                                        SERVICE_ID,
+                                        dateTime,
+                                        "teste"
+                                )
+                        )
+                        .getCancelToken()
+        );
+    }
+
+    @Test
+    void cancelScheduledAppointmentShouldCreateAvailableSlot() {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
+        AppointmentEntity appointment =
+                existingAppointment(
+                        dateTime,
+                        40,
+                        AppointmentStatus.SCHEDULED
+                );
+
+        when(appointmentRepository.findByCancelToken(
+                APPOINTMENT_ID.toString()
+        )).thenReturn(Optional.of(appointment));
+
+        appointmentService.cancelByToken(APPOINTMENT_ID);
+
+        assertEquals(AppointmentStatus.CANCELED,
+                appointment.getStatus());
+        verify(appointmentRepository).save(appointment);
+        verify(availableSlotService).registerAvailableSlot(
+                barber,
+                dateTime
+        );
+    }
+
+    @Test
+    void cancelAlreadyCanceledAppointmentShouldNotCreateAvailableSlot() {
+        AppointmentEntity appointment =
+                existingAppointment(
+                        LocalDateTime.of(2026, 9, 2, 10, 0),
+                        40,
+                        AppointmentStatus.CANCELED
+                );
+
+        when(appointmentRepository.findByCancelToken(
+                APPOINTMENT_ID.toString()
+        )).thenReturn(Optional.of(appointment));
+
+        BusinessException exception =
+                assertThrows(
+                        BusinessException.class,
+                        () -> appointmentService.cancelByToken(APPOINTMENT_ID)
+                );
+
+        assertEquals("Agendamento já está cancelado.",
+                exception.getMessage());
+        verify(appointmentRepository, never()).save(appointment);
+        verify(availableSlotService, never()).registerAvailableSlot(
+                any(),
+                any()
+        );
     }
 
     @Test

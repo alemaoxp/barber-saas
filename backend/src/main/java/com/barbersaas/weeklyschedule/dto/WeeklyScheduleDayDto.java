@@ -6,8 +6,11 @@ import java.time.LocalTime;
 public class WeeklyScheduleDayDto {
 
     private DayOfWeek dayOfWeek;
-    private boolean workingDay; private LocalTime startTime;
+    private boolean workingDay;
+    private LocalTime startTime;
     private LocalTime endTime;
+    private LocalTime breakStartTime;
+    private LocalTime breakEndTime;
 
     public WeeklyScheduleDayDto() {
     }
@@ -16,11 +19,15 @@ public class WeeklyScheduleDayDto {
             DayOfWeek dayOfWeek,
             boolean workingDay,
             LocalTime startTime,
-            LocalTime endTime) {
+            LocalTime endTime,
+            LocalTime breakStartTime,
+            LocalTime breakEndTime) {
         this.dayOfWeek = dayOfWeek;
         this.workingDay = workingDay;
         this.startTime = startTime;
         this.endTime = endTime;
+        this.breakStartTime = breakStartTime;
+        this.breakEndTime = breakEndTime;
     }
 
     public DayOfWeek getDayOfWeek() {
@@ -55,6 +62,22 @@ public class WeeklyScheduleDayDto {
         this.endTime = endTime;
     }
 
+    public LocalTime getBreakStartTime() {
+        return breakStartTime;
+    }
+
+    public void setBreakStartTime(LocalTime breakStartTime) {
+        this.breakStartTime = breakStartTime;
+    }
+
+    public LocalTime getBreakEndTime() {
+        return breakEndTime;
+    }
+
+    public void setBreakEndTime(LocalTime breakEndTime) {
+        this.breakEndTime = breakEndTime;
+    }
+
     @Override
     public String toString() {
         return "WeeklyScheduleDayDto{" +
@@ -62,6 +85,8 @@ public class WeeklyScheduleDayDto {
                 ", workingDay=" + workingDay +
                 ", startTime=" + startTime +
                 ", endTime=" + endTime +
+                ", breakStartTime=" + breakStartTime +
+                ", breakEndTime=" + breakEndTime +
                 '}';
     }
 }

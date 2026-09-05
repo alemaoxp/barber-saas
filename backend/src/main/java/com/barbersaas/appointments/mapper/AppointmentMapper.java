@@ -2,69 +2,66 @@ package com.barbersaas.appointments.mapper;
 
 import com.barbersaas.appointments.dto.AppointmentResponse;
 import com.barbersaas.appointments.dto.CreateAppointmentRequest;
+import com.barbersaas.appointments.dto.PublicAppointmentResponse;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
-import com.barbersaas.barbers.dto.BarberResponse;
+import com.barbersaas.appointments.enums.AppointmentStatus;
 import com.barbersaas.barbers.entity.BarberEntity;
-import com.barbersaas.barbers.mapper.BarberMapper;
-import com.barbersaas.customers.dto.CustomerResponse;
 import com.barbersaas.customers.entity.CustomerEntity;
-import com.barbersaas.customers.mapper.CustomerMapper;
-import com.barbersaas.services.dto.ServiceResponse;
 import com.barbersaas.services.entity.ServiceEntity;
-import com.barbersaas.services.mapper.ServiceMapper;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AppointmentMapper {
 
-    private final CustomerMapper customerMapper;
-    private final BarberMapper barberMapper;
-    private final ServiceMapper serviceMapper;
-
-    public AppointmentMapper(CustomerMapper customerMapper, BarberMapper barberMapper, ServiceMapper serviceMapper) {
-        this.customerMapper = customerMapper;
-        this.barberMapper = barberMapper;
-        this.serviceMapper = serviceMapper;
+    public AppointmentEntity toEntity(
+            CreateAppointmentRequest request,
+            CustomerEntity customer,
+            BarberEntity barber,
+            ServiceEntity service) {
+        return new AppointmentEntity(
+                customer,
+                barber,
+                service,
+                request.getAppointmentDateTime(),
+                AppointmentStatus.SCHEDULED,
+                request.getNotes()
+        );
     }
 
-    public AppointmentEntity toEntity(CustomerEntity customer, BarberEntity barber, ServiceEntity service, 
-                                    CreateAppointmentRequest request) {
-        AppointmentEntity entity = new AppointmentEntity();
+    public void updateEntity(
+            AppointmentEntity entity,
+            UpdateAppointmentRequest request,
+            CustomerEntity customer,
+            ServiceEntity service) {
         entity.setCustomer(customer);
-        entity.setBarber(barber);
         entity.setService(service);
-        entity.setDate(request.getDate());
-        entity.setTime(request.getTime());
-        entity.setStatus(request.getStatus());
-        return entity;
-    }
-
-    public void updateEntity(AppointmentEntity entity, CustomerEntity customer, BarberEntity barber, 
-                           ServiceEntity service, UpdateAppointmentRequest request) {
-        entity.setCustomer(customer);
-        entity.setBarber(barber);
-        entity.setService(service);
-        entity.setDate(request.getDate());
-        entity.setTime(request.getTime());
-        entity.setStatus(request.getStatus());
+        entity.setAppointmentDateTime(request.getAppointmentDateTime());
+        entity.setNotes(request.getNotes());
     }
 
     public AppointmentResponse toResponse(AppointmentEntity entity) {
-        AppointmentResponse response = new AppointmentResponse();
-        response.setId(entity.getId());
-        
-        CustomerResponse customerResponse = customerMapper.toResponse(entity.getCustomer());
-        BarberResponse barberResponse = barberMapper.toResponse(entity.getBarber());
-        ServiceResponse serviceResponse = serviceMapper.toResponse(entity.getService());
-        
-        response.setCustomer(customerResponse);
-        response.setBarber(barberResponse);
-        response.setService(serviceResponse);
-        response.setDate(entity.getDate());
-        response.setTime(entity.getTime());
-        response.setStatus(entity.getStatus());
-        
-        return response;
+        return new AppointmentResponse(
+                entity.getId(),
+                entity.getCustomer().getId(),
+                entity.getService().getId(),
+                entity.getAppointmentDateTime(),
+                entity.getStatus(),
+                entity.getNotes(),
+                entity.getCreatedAt()
+        );
+    }
+
+    public PublicAppointmentResponse toPublicResponse(AppointmentEntity entity) {
+        return new PublicAppointmentResponse(
+                entity.getId(),
+                entity.getCustomer().getId(),
+                entity.getService().getId(),
+                entity.getAppointmentDateTime(),
+                entity.getStatus(),
+                entity.getNotes(),
+                entity.getCreatedAt(),
+                entity.getCancelToken()
+        );
     }
 }
