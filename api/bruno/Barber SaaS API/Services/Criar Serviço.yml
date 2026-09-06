@@ -1,0 +1,25 @@
+info:
+  name: Criar Serviço
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8080/api/v1/services
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Corte Masculino",
+        "description": "Corte tradicional na máquina e tesoura",
+        "durationMinutes": 45,
+        "price": 55.00,
+        "active": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

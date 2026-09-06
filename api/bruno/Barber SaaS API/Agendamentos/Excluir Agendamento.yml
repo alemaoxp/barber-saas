@@ -1,0 +1,15 @@
+info:
+  name: Excluir Agendamento
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: http://localhost:8080/api/v1/barbers/3700633c-35f1-4ab9-af18-c60f8eb23b45/appointments/3c699a9e-4e5d-459f-848f-4f320560a221
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

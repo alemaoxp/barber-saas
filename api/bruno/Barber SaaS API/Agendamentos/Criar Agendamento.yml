@@ -1,0 +1,24 @@
+info:
+  name: Criar Agendamento
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8080/api/v1/barbers/3700633c-35f1-4ab9-af18-c60f8eb23b45/appointments
+  body:
+    type: json
+    data: |-
+      {
+        "customerId": "b4b89988-75bf-463c-a269-a15a261ae143",
+        "serviceId": "82dbf073-ccbe-48c2-8540-613f227a2c28",
+        "appointmentDateTime": "2026-09-01T10:00:00",
+        "notes": "Teste de conflito"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

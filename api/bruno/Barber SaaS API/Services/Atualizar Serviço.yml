@@ -1,0 +1,15 @@
+info:
+  name: Atualizar Serviço
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:8080/api/v1/services/SEU_UUID_AQUI
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

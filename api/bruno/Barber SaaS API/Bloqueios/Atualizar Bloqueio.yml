@@ -1,0 +1,23 @@
+info:
+  name: Atualizar Bloqueio
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:8080/api/v1/barbers/3700633c-35f1-4ab9-af18-c60f8eb23b45/schedule-blocks/5144fbdf-89ed-465b-b728-bb7a3e232e7f
+  body:
+    type: json
+    data: |-
+      {
+        "startDateTime": "2026-07-20T09:00:00",
+        "endDateTime": "2026-07-20T13:00:00",
+        "reason": "Consulta médica"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

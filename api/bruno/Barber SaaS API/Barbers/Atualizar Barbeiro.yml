@@ -1,0 +1,25 @@
+info:
+  name: Atualizar Barbeiro
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: http://localhost:8080/api/v1/barbers/SEU_UUID_AQUI
+  body:
+    type: json
+    data: |-
+      {
+        "name": "João Silva",
+        "email": "joao@barber.com",
+        "phone": "(11) 98888-7777",
+        "specialties": "Degradê, Barba, Sobrancelha",
+        "active": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

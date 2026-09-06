@@ -1,0 +1,23 @@
+info:
+  name: Criar Bloqueio
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8080/api/v1/barbers/3700633c-35f1-4ab9-af18-c60f8eb23b45/schedule-blocks
+  body:
+    type: json
+    data: |-
+      {
+        "startDateTime": "2026-09-01T09:30:00",
+        "endDateTime": "2026-09-01T13:00:00",
+        "reason": "Teste de bloqueio"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

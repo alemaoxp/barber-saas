@@ -1,0 +1,24 @@
+info:
+  name: Atualizar Agendamento
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: http://localhost:8080/api/v1/barbers/3700633c-35f1-4ab9-af18-c60f8eb23b45/appointments/3c699a9e-4e5d-459f-848f-4f320560a221
+  body:
+    type: json
+    data: |-
+      {
+        "customerId": "b4b89988-75bf-463c-a269-a15a261ae143",
+        "serviceId": "82dbf073-ccbe-48c2-8540-613f227a2c28",
+        "appointmentDateTime": "2026-08-31T15:00:00",
+        "notes": "Agendamento atualizado"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

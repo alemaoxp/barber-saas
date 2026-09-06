@@ -1,0 +1,15 @@
+info:
+  name: Excluir Bloqueio
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: http://localhost:8080/api/v1/barbers/3700633c-35f1-4ab9-af18-c60f8eb23b45/schedule-blocks/419e48e7-9ab9-4f19-aed6-4a5bc03231d1
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
