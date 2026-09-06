@@ -42,3 +42,4 @@ backend/.vscode/
 graphify-out/
 frontend/macos/DerivedData/
 frontend/.ai/
+backend/docs/codex-last-report.md
