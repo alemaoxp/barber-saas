@@ -39,6 +39,14 @@ public class ServiceService {
                 .collect(Collectors.toList());
     }
 
+    public List<ServiceResponse> findActive() {
+        return serviceRepository.findAll()
+                .stream()
+                .filter(service -> Boolean.TRUE.equals(service.getActive()))
+                .map(serviceMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
     public ServiceResponse findById(UUID id) {
         return serviceRepository.findById(id)
                 .map(serviceMapper::toResponse)

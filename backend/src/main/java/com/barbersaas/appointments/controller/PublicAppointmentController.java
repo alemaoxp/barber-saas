@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/public/appointments")
@@ -32,6 +33,11 @@ public class PublicAppointmentController {
             @Valid @RequestBody CreatePublicAppointmentRequest request) {
         
         return publicAppointmentService.createPublicAppointment(barberId, request);
+    }
+
+    @GetMapping
+    public List<PublicAppointmentResponse> findAppointments(@RequestParam String phone) {
+        return publicAppointmentService.findPublicAppointments(phone);
     }
 
     @DeleteMapping("/{token}")

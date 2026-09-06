@@ -491,6 +491,13 @@ public class AppointmentService {
                 .collect(Collectors.toList());
     }
 
+    public List<PublicAppointmentResponse> findPublicByCustomerId(UUID customerId) {
+        return appointmentRepository.findByCustomerIdOrderByAppointmentDateTimeDesc(customerId)
+                .stream()
+                .map(appointmentMapper::toPublicResponse)
+                .toList();
+    }
+
     public AppointmentResponse findById(
             UUID barberId,
             UUID appointmentId) {

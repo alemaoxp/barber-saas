@@ -23,6 +23,10 @@ public interface AppointmentRepository extends JpaRepository<AppointmentEntity, 
             UUID barberId
     );
 
+    List<AppointmentEntity> findByCustomerIdOrderByAppointmentDateTimeDesc(
+            UUID customerId
+    );
+
     List<AppointmentEntity> findByBarberIdAndAppointmentDateTimeBetween(
             UUID barberId,
             LocalDateTime start,

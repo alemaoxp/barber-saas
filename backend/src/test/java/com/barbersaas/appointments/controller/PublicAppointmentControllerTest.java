@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -121,5 +122,12 @@ class PublicAppointmentControllerTest {
                         CANCEL_TOKEN
                 ))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void publicAppointmentsShouldExposeCustomerScopedLookup() throws Exception {
+        mockMvc.perform(get("/api/public/appointments")
+                        .param("phone", "(11) 97777-1234"))
+                .andExpect(status().isOk());
     }
 }

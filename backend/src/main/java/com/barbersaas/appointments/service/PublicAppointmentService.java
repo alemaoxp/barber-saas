@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.List;
 
 @Service
 @Transactional
@@ -34,6 +35,13 @@ public class PublicAppointmentService {
                 barberId,
                 convertToAppointmentRequest(request, customer.getId())
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<PublicAppointmentResponse> findPublicAppointments(String customerPhone) {
+        return customerRepository.findByPhone(customerPhone)
+                .map(customer -> appointmentService.findPublicByCustomerId(customer.getId()))
+                .orElseGet(List::of);
     }
 
     private CustomerEntity findOrCreateCustomer(String customerName, String customerPhone) {
