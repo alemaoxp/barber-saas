@@ -24,12 +24,14 @@ import com.barbersaas.weeklyschedule.service.WeeklyScheduleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -89,13 +91,11 @@ public class AppointmentService {
 
     private void validateAvailability(
             UUID barberId,
-            LocalDateTime appointmentDateTime,
-            int durationMinutes) {
+            LocalDateTime appointmentDateTime) {
 
         validateAvailability(
                 barberId,
                 appointmentDateTime,
-                durationMinutes,
                 null
         );
     }
@@ -103,13 +103,11 @@ public class AppointmentService {
     public void validateAvailabilityIgnoringAppointment(
             UUID barberId,
             LocalDateTime appointmentDateTime,
-            int durationMinutes,
             UUID ignoredAppointmentId) {
 
         validateAvailability(
                 barberId,
                 appointmentDateTime,
-                durationMinutes,
                 ignoredAppointmentId
         );
     }
@@ -117,8 +115,11 @@ public class AppointmentService {
     private void validateAvailability(
             UUID barberId,
             LocalDateTime appointmentDateTime,
-            int durationMinutes,
             UUID ignoredAppointmentId) {
+
+        int intervalMinutes = getAppointmentIntervalMinutes(
+                appointmentDateTime.getDayOfWeek()
+        );
 
         weeklyScheduleService.validateWorkingDay(
                 barberId,
@@ -133,11 +134,11 @@ public class AppointmentService {
         scheduleBlockService.validateIntervalNotBlocked(
                 barberId,
                 appointmentDateTime,
-                durationMinutes
+                intervalMinutes
         );
 
         LocalDateTime appointmentEnd =
-                appointmentDateTime.plusMinutes(durationMinutes);
+                appointmentDateTime.plusMinutes(intervalMinutes);
 
         LocalDateTime searchStart =
                 appointmentDateTime.minusHours(8);
@@ -167,10 +168,9 @@ public class AppointmentService {
                     LocalDateTime existingStart =
                             existingAppointment.getAppointmentDateTime();
 
-                    int existingDuration =
-                            existingAppointment
-                                    .getService()
-                                    .getDurationMinutes();
+                    int existingDuration = getAppointmentIntervalMinutes(
+                            existingStart.getDayOfWeek()
+                    );
 
                     LocalDateTime existingEnd =
                             existingStart.plusMinutes(existingDuration);
@@ -436,27 +436,17 @@ public class AppointmentService {
                                         "Cliente não encontrado."
                                 ));
 
-        ServiceEntity service =
-                serviceRepository.findById(
-                                request.getServiceId()
-                        )
-                        .orElseThrow(() ->
-                                new NotFoundException(
-                                        "Serviço não encontrado."
-                                ));
+        List<ServiceEntity> services = findServices(request.getServiceIds());
 
-        validateAvailability(
-                barberId,
-                request.getAppointmentDateTime(),
-                service.getDurationMinutes()
-        );
+        validateAvailability(barberId, request.getAppointmentDateTime());
 
         AppointmentEntity entity =
                 appointmentMapper.toEntity(
                         request,
                         customer,
                         barber,
-                        service
+                        services,
+                        totalPrice(services)
                 );
 
         if (generateCancelToken) {
@@ -466,6 +456,23 @@ public class AppointmentService {
         }
 
         return appointmentRepository.save(entity);
+    }
+
+    private List<ServiceEntity> findServices(List<UUID> serviceIds) {
+        if (serviceIds.size() != new LinkedHashSet<>(serviceIds).size()) {
+            throw new BusinessException("Serviços não podem se repetir.");
+        }
+
+        return serviceIds.stream()
+                .map(serviceId -> serviceRepository.findById(serviceId)
+                        .orElseThrow(() -> new NotFoundException("Serviço não encontrado.")))
+                .toList();
+    }
+
+    private BigDecimal totalPrice(List<ServiceEntity> services) {
+        return services.stream()
+                .map(ServiceEntity::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public List<AppointmentResponse> findAll(
@@ -525,19 +532,11 @@ public class AppointmentService {
                                         "Cliente não encontrado."
                                 ));
 
-        ServiceEntity service =
-                serviceRepository.findById(
-                                request.getServiceId()
-                        )
-                        .orElseThrow(() ->
-                                new NotFoundException(
-                                        "Serviço não encontrado."
-                                ));
+        List<ServiceEntity> services = findServices(request.getServiceIds());
 
         validateAvailabilityIgnoringAppointment(
                 barberId,
                 request.getAppointmentDateTime(),
-                service.getDurationMinutes(),
                 appointment.getId()
         );
 
@@ -545,7 +544,8 @@ public class AppointmentService {
                 appointment,
                 request,
                 customer,
-                service
+                services,
+                totalPrice(services)
         );
 
         AppointmentEntity updatedEntity =

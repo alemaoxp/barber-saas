@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
@@ -82,7 +84,8 @@ class PublicAppointmentControllerTest {
                 new PublicAppointmentResponse(
                         APPOINTMENT_ID,
                         CUSTOMER_ID,
-                        SERVICE_ID,
+                        List.of(SERVICE_ID),
+                        BigDecimal.valueOf(40),
                         dateTime,
                         AppointmentStatus.SCHEDULED,
                         "teste",
@@ -98,7 +101,7 @@ class PublicAppointmentControllerTest {
                                 {
                                   "customerName": "Cliente",
                                   "customerPhone": "(11) 97777-1234",
-                                  "serviceId": "%s",
+                                  "serviceIds": ["%s"],
                                   "appointmentDateTime": "%s",
                                   "notes": "teste"
                                 }

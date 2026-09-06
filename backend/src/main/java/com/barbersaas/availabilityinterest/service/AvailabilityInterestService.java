@@ -329,7 +329,6 @@ public class AvailabilityInterestService {
         appointmentService.validateAvailabilityIgnoringAppointment(
                 barberId,
                 slotDateTime,
-                appointment.getService().getDurationMinutes(),
                 appointment.getId()
         );
 
@@ -384,7 +383,6 @@ public class AvailabilityInterestService {
             appointmentService.validateAvailabilityIgnoringAppointment(
                     appointment.getBarber().getId(),
                     slot.getAvailableDateTime(),
-                    appointment.getService().getDurationMinutes(),
                     appointment.getId()
             );
             return true;

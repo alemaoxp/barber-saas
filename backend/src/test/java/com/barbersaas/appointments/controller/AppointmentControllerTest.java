@@ -19,6 +19,7 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,6 +44,8 @@ class AppointmentControllerTest {
             UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID SERVICE_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private static final UUID SECOND_SERVICE_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000005");
     private static final UUID APPOINTMENT_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000004");
 
@@ -78,14 +81,15 @@ class AppointmentControllerTest {
                         .content("""
                                 {
                                   "customerId": "%s",
-                                  "serviceId": "%s",
+                                  "serviceIds": ["%s", "%s"],
                                   "appointmentDateTime": "%s",
                                   "notes": "teste"
                                 }
-                                """.formatted(CUSTOMER_ID, SERVICE_ID, dateTime)))
+                                """.formatted(CUSTOMER_ID, SERVICE_ID, SECOND_SERVICE_ID, dateTime)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.customerId", is(CUSTOMER_ID.toString())))
-                .andExpect(jsonPath("$.serviceId", is(SERVICE_ID.toString())))
+                .andExpect(jsonPath("$.serviceIds[0]", is(SERVICE_ID.toString())))
+                .andExpect(jsonPath("$.serviceIds[1]", is(SECOND_SERVICE_ID.toString())))
                 .andExpect(jsonPath("$.status", is("SCHEDULED")))
                 .andExpect(jsonPath("$.cancelToken").doesNotExist());
     }
@@ -101,11 +105,11 @@ class AppointmentControllerTest {
                         .content("""
                                 {
                                   "customerId": "%s",
-                                  "serviceId": "%s",
+                                  "serviceIds": ["%s"],
                                   "appointmentDateTime": "%s",
                                   "notes": "teste"
                                 }
-                                """.formatted(CUSTOMER_ID, SERVICE_ID, dateTime)))
+                """.formatted(CUSTOMER_ID, SERVICE_ID, dateTime)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.error", is("Horário fora do expediente.")));
@@ -120,7 +124,7 @@ class AppointmentControllerTest {
         mockMvc.perform(get("/api/v1/barbers/{barberId}/appointments", BARBER_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].customerId", is(CUSTOMER_ID.toString())))
-                .andExpect(jsonPath("$[0].serviceId", is(SERVICE_ID.toString())));
+                .andExpect(jsonPath("$[0].serviceIds[0]", is(SERVICE_ID.toString())));
     }
 
     @Test
@@ -138,7 +142,7 @@ class AppointmentControllerTest {
                         .content("""
                                 {
                                   "customerId": "%s",
-                                  "serviceId": "%s",
+                                  "serviceIds": ["%s"],
                                   "appointmentDateTime": "%s",
                                   "notes": "alterado"
                                 }
@@ -164,7 +168,8 @@ class AppointmentControllerTest {
         return new AppointmentResponse(
                 APPOINTMENT_ID,
                 CUSTOMER_ID,
-                SERVICE_ID,
+                List.of(SERVICE_ID, SECOND_SERVICE_ID),
+                BigDecimal.valueOf(70),
                 dateTime,
                 AppointmentStatus.SCHEDULED,
                 "teste",

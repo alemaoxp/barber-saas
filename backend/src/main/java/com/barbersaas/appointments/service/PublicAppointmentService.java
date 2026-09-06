@@ -55,7 +55,7 @@ public class PublicAppointmentService {
             new com.barbersaas.appointments.dto.CreateAppointmentRequest();
         
         request.setCustomerId(customerId);
-        request.setServiceId(publicRequest.getServiceId());
+        request.setServiceIds(publicRequest.getServiceIds());
         request.setAppointmentDateTime(publicRequest.getAppointmentDateTime());
         request.setNotes(publicRequest.getNotes());
         

@@ -133,7 +133,6 @@ class AvailabilityInterestServiceTest {
                 .validateAvailabilityIgnoringAppointment(
                         BARBER_ID,
                         slot.getAvailableDateTime(),
-                        40,
                         APPOINTMENT_ID
                 );
         verify(availableSlotRepository).save(slot);
@@ -218,7 +217,6 @@ class AvailabilityInterestServiceTest {
                 .validateAvailabilityIgnoringAppointment(
                         BARBER_ID,
                         slot.getAvailableDateTime(),
-                        40,
                         APPOINTMENT_ID
                 );
     }
@@ -345,7 +343,8 @@ class AvailabilityInterestServiceTest {
         AppointmentEntity entity = new AppointmentEntity(
                 customer,
                 barber,
-                service,
+                List.of(service),
+                BigDecimal.valueOf(50),
                 dateTime,
                 AppointmentStatus.SCHEDULED,
                 "teste"

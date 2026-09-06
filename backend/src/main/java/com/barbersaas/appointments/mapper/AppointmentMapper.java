@@ -11,57 +11,36 @@ import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.services.entity.ServiceEntity;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 @Component
 public class AppointmentMapper {
-
-    public AppointmentEntity toEntity(
-            CreateAppointmentRequest request,
-            CustomerEntity customer,
-            BarberEntity barber,
-            ServiceEntity service) {
-        return new AppointmentEntity(
-                customer,
-                barber,
-                service,
-                request.getAppointmentDateTime(),
-                AppointmentStatus.SCHEDULED,
-                request.getNotes()
-        );
+    public AppointmentEntity toEntity(CreateAppointmentRequest request, CustomerEntity customer, BarberEntity barber,
+                                      List<ServiceEntity> services, BigDecimal totalPrice) {
+        return new AppointmentEntity(customer, barber, services, totalPrice, request.getAppointmentDateTime(),
+                AppointmentStatus.SCHEDULED, request.getNotes());
     }
 
-    public void updateEntity(
-            AppointmentEntity entity,
-            UpdateAppointmentRequest request,
-            CustomerEntity customer,
-            ServiceEntity service) {
+    public void updateEntity(AppointmentEntity entity, UpdateAppointmentRequest request, CustomerEntity customer,
+                             List<ServiceEntity> services, BigDecimal totalPrice) {
         entity.setCustomer(customer);
-        entity.setService(service);
+        entity.setServices(services);
+        entity.setTotalPrice(totalPrice);
         entity.setAppointmentDateTime(request.getAppointmentDateTime());
         entity.setNotes(request.getNotes());
     }
 
     public AppointmentResponse toResponse(AppointmentEntity entity) {
-        return new AppointmentResponse(
-                entity.getId(),
-                entity.getCustomer().getId(),
-                entity.getService().getId(),
-                entity.getAppointmentDateTime(),
-                entity.getStatus(),
-                entity.getNotes(),
-                entity.getCreatedAt()
-        );
+        return new AppointmentResponse(entity.getId(), entity.getCustomer().getId(),
+                entity.getServices().stream().map(ServiceEntity::getId).toList(), entity.getTotalPrice(),
+                entity.getAppointmentDateTime(), entity.getStatus(), entity.getNotes(), entity.getCreatedAt());
     }
 
     public PublicAppointmentResponse toPublicResponse(AppointmentEntity entity) {
-        return new PublicAppointmentResponse(
-                entity.getId(),
-                entity.getCustomer().getId(),
-                entity.getService().getId(),
-                entity.getAppointmentDateTime(),
-                entity.getStatus(),
-                entity.getNotes(),
-                entity.getCreatedAt(),
-                entity.getCancelToken()
-        );
+        return new PublicAppointmentResponse(entity.getId(), entity.getCustomer().getId(),
+                entity.getServices().stream().map(ServiceEntity::getId).toList(), entity.getTotalPrice(),
+                entity.getAppointmentDateTime(), entity.getStatus(), entity.getNotes(), entity.getCreatedAt(),
+                entity.getCancelToken());
     }
 }

@@ -55,6 +55,8 @@ class AppointmentServiceTest {
             UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID SERVICE_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private static final UUID SECOND_SERVICE_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000005");
     private static final UUID APPOINTMENT_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000004");
 
@@ -83,6 +85,7 @@ class AppointmentServiceTest {
     private BarberEntity barber;
     private CustomerEntity customer;
     private ServiceEntity service40Minutes;
+    private ServiceEntity service30Minutes;
 
     @BeforeEach
     void setUp() {
@@ -99,7 +102,8 @@ class AppointmentServiceTest {
 
         barber = barber();
         customer = customer();
-        service40Minutes = service(40);
+        service40Minutes = service(SERVICE_ID, 40, 50);
+        service30Minutes = service(SECOND_SERVICE_ID, 30, 30);
 
         lenient().when(barberRepository.findById(BARBER_ID))
                 .thenReturn(Optional.of(barber));
@@ -107,6 +111,8 @@ class AppointmentServiceTest {
                 .thenReturn(Optional.of(customer));
         lenient().when(serviceRepository.findById(SERVICE_ID))
                 .thenReturn(Optional.of(service40Minutes));
+        lenient().when(serviceRepository.findById(SECOND_SERVICE_ID))
+                .thenReturn(Optional.of(service30Minutes));
         lenient().when(appointmentRepository.save(any(AppointmentEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
@@ -206,7 +212,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
                 eq(BARBER_ID),
                 eq(dateTime.minusHours(8)),
-                eq(dateTime.plusMinutes(40))
+                eq(dateTime.plusMinutes(30))
         )).thenReturn(List.of(existingAppointment(dateTime, 40, AppointmentStatus.SCHEDULED)));
 
         BusinessException exception = assertThrows(
@@ -224,7 +230,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
                 eq(BARBER_ID),
                 eq(dateTime.minusHours(8)),
-                eq(dateTime.plusMinutes(40))
+                eq(dateTime.plusMinutes(30))
         )).thenReturn(List.of(existingAppointment(dateTime, 40, AppointmentStatus.CANCELED)));
 
         assertDoesNotThrow(() -> createAt(dateTime));
@@ -248,7 +254,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
                 eq(BARBER_ID),
                 eq(dateTime.minusHours(8)),
-                eq(dateTime.plusMinutes(40))
+                eq(dateTime.plusMinutes(30))
         )).thenReturn(List.of(appointment));
 
         assertDoesNotThrow(
@@ -257,7 +263,7 @@ class AppointmentServiceTest {
                         APPOINTMENT_ID,
                         new UpdateAppointmentRequest(
                                 CUSTOMER_ID,
-                                SERVICE_ID,
+                                List.of(SERVICE_ID),
                                 dateTime,
                                 "teste"
                         )
@@ -270,7 +276,7 @@ class AppointmentServiceTest {
         LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
         doThrow(new BusinessException("O horário do serviço está bloqueado."))
                 .when(scheduleBlockService)
-                .validateIntervalNotBlocked(BARBER_ID, dateTime, 40);
+                .validateIntervalNotBlocked(BARBER_ID, dateTime, 30);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -296,13 +302,33 @@ class AppointmentServiceTest {
                                 BARBER_ID,
                                 new CreateAppointmentRequest(
                                         CUSTOMER_ID,
-                                        SERVICE_ID,
+                                        List.of(SERVICE_ID),
                                         dateTime,
                                         "teste"
                                 )
                         )
                         .getCancelToken()
         );
+    }
+
+    @Test
+    void multipleServicesShouldSumPricesWithoutChangingWednesdayInterval() {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 11, 0);
+
+        var response = appointmentService.create(
+                BARBER_ID,
+                new CreateAppointmentRequest(
+                        CUSTOMER_ID,
+                        List.of(SERVICE_ID, SECOND_SERVICE_ID),
+                        dateTime,
+                        "teste"
+                )
+        );
+
+        assertEquals(List.of(SERVICE_ID, SECOND_SERVICE_ID), response.getServiceIds());
+        assertEquals(BigDecimal.valueOf(80), response.getTotalPrice());
+        verify(scheduleBlockService)
+                .validateIntervalNotBlocked(BARBER_ID, dateTime, 30);
     }
 
     @Test
@@ -514,7 +540,7 @@ class AppointmentServiceTest {
                 BARBER_ID,
                 new CreateAppointmentRequest(
                         CUSTOMER_ID,
-                        SERVICE_ID,
+                        List.of(SERVICE_ID),
                         dateTime,
                         "teste"
                 )
@@ -546,15 +572,15 @@ class AppointmentServiceTest {
         return entity;
     }
 
-    private ServiceEntity service(int durationMinutes) {
+    private ServiceEntity service(UUID id, int durationMinutes, int price) {
         ServiceEntity entity = new ServiceEntity(
                 "Corte",
                 "Corte masculino",
                 durationMinutes,
-                BigDecimal.valueOf(50),
+                BigDecimal.valueOf(price),
                 true
         );
-        ReflectionTestUtils.setField(entity, "id", SERVICE_ID);
+        ReflectionTestUtils.setField(entity, "id", id);
         return entity;
     }
 
@@ -566,7 +592,8 @@ class AppointmentServiceTest {
         return new AppointmentEntity(
                 customer,
                 barber,
-                service(durationMinutes),
+                List.of(service(SERVICE_ID, durationMinutes, 50)),
+                BigDecimal.valueOf(50),
                 dateTime,
                 status,
                 null
