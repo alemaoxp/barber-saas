@@ -45,6 +45,15 @@ public class AvailabilityInterestController {
         return ResponseEntity.ok(availabilityInterestService.findById(interestId));
     }
 
+    @GetMapping("/active")
+    public ResponseEntity<AvailabilityInterestResponse> findActive(
+            @PathVariable UUID customerId,
+            @org.springframework.web.bind.annotation.RequestParam UUID appointmentId) {
+        return availabilityInterestService.findActive(customerId, appointmentId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @DeleteMapping("/{interestId}")
     public ResponseEntity<Void> cancel(
             @PathVariable UUID customerId,

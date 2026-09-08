@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../data/data_page.dart';
 import '../../models/appointment_data.dart';
+import '../../models/booking_service.dart';
+import '../../services/barber_api.dart';
 
 class ServicePage extends StatefulWidget {
   final AppointmentData appointment;
@@ -19,38 +21,36 @@ class _ServicePageState extends State<ServicePage> {
   // SERVIÇOS
   // ============================================================
 
-  final List<_ServiceOption> _services = const [
-    _ServiceOption(
-      name: 'Corte Masculino',
-      description: 'Corte tradicional ou moderno.',
-      price: 40.00,
-      icon: Icons.content_cut_rounded,
-    ),
-    _ServiceOption(
-      name: 'Barba',
-      description: 'Modelagem completa da barba.',
-      price: 30.00,
-      icon: Icons.face_rounded,
-    ),
-    _ServiceOption(
-      name: 'Sobrancelha',
-      description: 'Design e acabamento.',
-      price: 15.00,
-      icon: Icons.remove_red_eye_outlined,
-    ),
-    _ServiceOption(
-      name: 'Lavagem',
-      description: 'Lavagem e finalização.',
-      price: 10.00,
-      icon: Icons.water_drop_outlined,
-    ),
-  ];
+  final BarberApi _api = BarberApi();
+  List<BookingService> _services = const [];
+  bool _loading = true;
+  String? _error;
 
   // ============================================================
   // SERVIÇOS SELECIONADOS
   // ============================================================
 
   final Set<int> _selectedServices = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServices();
+  }
+
+  Future<void> _loadServices() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final services = await _api.services();
+      if (mounted) setState(() => _services = services);
+    } on BarberApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Não foi possível carregar os serviços.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   // ============================================================
   // CÁLCULOS
@@ -241,6 +241,9 @@ class _ServicePageState extends State<ServicePage> {
   // ============================================================
 
   Widget _buildServices() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) return Center(child: TextButton(onPressed: _loadServices, child: Text('Tentar novamente\n$_error', textAlign: TextAlign.center)));
+    if (_services.isEmpty) return const Center(child: Text('Nenhum serviço disponível no momento.'));
     return Scrollbar(
       radius: const Radius.circular(10),
       thickness: 3,
@@ -285,7 +288,7 @@ class _ServicePageState extends State<ServicePage> {
   // ============================================================
 
   Widget _buildServiceCard({
-    required _ServiceOption service,
+    required BookingService service,
     required bool selected,
   }) {
     return AnimatedContainer(
@@ -365,7 +368,7 @@ class _ServicePageState extends State<ServicePage> {
             ),
 
             child: Icon(
-              service.icon,
+              Icons.content_cut_rounded,
               size: 25,
               color: const Color(0xFF444444),
             ),
@@ -750,6 +753,8 @@ class _ServicePageState extends State<ServicePage> {
     widget.appointment.services =
         selectedServices;
 
+    widget.appointment.serviceIds = _selectedServices.map((index) => _services[index].id).toList();
+
     widget.appointment.total =
         _total;
 
@@ -774,17 +779,3 @@ class _ServicePageState extends State<ServicePage> {
 // ============================================================
 // MODELO DO SERVIÇO
 // ============================================================
-
-class _ServiceOption {
-  final String name;
-  final String description;
-  final double price;
-  final IconData icon;
-
-  const _ServiceOption({
-    required this.name,
-    required this.description,
-    required this.price,
-    required this.icon,
-  });
-}

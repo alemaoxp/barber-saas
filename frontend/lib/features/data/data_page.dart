@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../formatters/brazilian_phone_input_formatter.dart';
 import '../../models/appointment_data.dart';
 import '../confirmation/confirmation_page.dart';
 
@@ -88,8 +89,7 @@ class _DataPageState extends State<DataPage> {
 
         if (savedPhone != null &&
             savedPhone.isNotEmpty) {
-          _phoneController.text =
-              savedPhone;
+          _phoneController.text = BrazilianPhoneInputFormatter.format(savedPhone);
         }
 
         if (savedWhatsapp != null) {
@@ -685,6 +685,8 @@ class _DataPageState extends State<DataPage> {
                   keyboardType:
                   TextInputType.phone,
 
+                  inputFormatters: [BrazilianPhoneInputFormatter()],
+
                   style:
                   const TextStyle(
                     fontSize: 17,
@@ -1144,8 +1146,7 @@ class _DataPageState extends State<DataPage> {
     final phone =
     _phoneController.text.trim();
 
-    if (name.isEmpty ||
-        phone.isEmpty) {
+    if (name.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(
@@ -1159,6 +1160,16 @@ class _DataPageState extends State<DataPage> {
         ),
       );
 
+      return;
+    }
+
+    if (!BrazilianPhoneInputFormatter.isValid(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Digite um telefone válido com DDD.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 

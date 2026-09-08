@@ -21,6 +21,7 @@ import com.barbersaas.weeklyschedule.service.WeeklyScheduleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,6 +83,9 @@ class AppointmentServiceTest {
     @Mock
     private AvailableSlotService availableSlotService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private AppointmentService appointmentService;
     private BarberEntity barber;
     private CustomerEntity customer;
@@ -97,7 +102,8 @@ class AppointmentServiceTest {
                 new AppointmentMapper(),
                 scheduleBlockService,
                 weeklyScheduleService,
-                availableSlotService
+                availableSlotService,
+                eventPublisher
         );
 
         barber = barber();
@@ -344,6 +350,9 @@ class AppointmentServiceTest {
         when(appointmentRepository.findByCancelToken(
                 APPOINTMENT_ID.toString()
         )).thenReturn(Optional.of(appointment));
+        when(availableSlotService.registerAvailableSlot(barber, dateTime))
+                .thenReturn(new com.barbersaas.availableslot.entity.AvailableSlotEntity(
+                        barber, dateTime));
 
         appointmentService.cancelByToken(APPOINTMENT_ID);
 
@@ -353,6 +362,11 @@ class AppointmentServiceTest {
         verify(availableSlotService).registerAvailableSlot(
                 barber,
                 dateTime
+        );
+        verify(eventPublisher).publishEvent(
+                new com.barbersaas.appointments.event.AvailableSlotCreatedEvent(
+                        barber.getId(), dateTime
+                )
         );
     }
 

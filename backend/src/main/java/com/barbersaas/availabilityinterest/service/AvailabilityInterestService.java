@@ -134,6 +134,19 @@ public class AvailabilityInterestService {
         );
     }
 
+    public java.util.Optional<AvailabilityInterestResponse> findActive(
+            UUID customerId,
+            UUID appointmentId) {
+
+        return availabilityInterestRepository
+                .findByCustomerIdAndAppointmentIdAndStatus(
+                        customerId,
+                        appointmentId,
+                        AvailabilityInterestStatus.ACTIVE
+                )
+                .map(availabilityInterestMapper::toResponse);
+    }
+
     public List<AvailabilityOpportunityResponse> findOpportunities(
             UUID customerId,
             UUID interestId) {

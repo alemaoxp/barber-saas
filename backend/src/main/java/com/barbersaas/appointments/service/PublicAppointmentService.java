@@ -52,6 +52,7 @@ public class PublicAppointmentService {
                     CustomerEntity newCustomer = new CustomerEntity();
                     newCustomer.setName(customerName);
                     newCustomer.setPhone(customerPhone);
+                    newCustomer.setActive(true);
                     return customerRepository.save(newCustomer);
                 });
     }

@@ -1,0 +1,180 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../models/appointment_data.dart';
+import '../models/availability_interest.dart';
+import '../models/booking_service.dart';
+import 'push_test_client.dart';
+
+const apiBaseUrl = 'http://localhost:8080';
+const barberId = '3700633c-35f1-4ab9-af18-c60f8eb23b45';
+
+class BarberApiException implements Exception {
+  final String message;
+  const BarberApiException(this.message);
+}
+
+class BarberApi {
+  BarberApi({
+    http.Client? client,
+    Future<Map<String, dynamic>> Function(String publicKey)?
+        createPushSubscription,
+  })  : _client = client ?? http.Client(),
+        _createPushSubscription =
+            createPushSubscription ?? createPushTestSubscription;
+
+  final http.Client _client;
+  final Future<Map<String, dynamic>> Function(String publicKey)
+      _createPushSubscription;
+
+  Future<List<BookingService>> services() async {
+    final response =
+        await _client.get(Uri.parse('$apiBaseUrl/api/public/services'));
+    return _list(response, BookingService.fromJson);
+  }
+
+  Future<List<String>> availableSlots(DateTime date) async {
+    final day =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final response = await _client.get(Uri.parse(
+        '$apiBaseUrl/api/public/barbers/$barberId/available-slots?date=$day'));
+    if (response.statusCode == 400 && _isNoWorkingDay(response.body)) {
+      return const [];
+    }
+    _ensureSuccess(response);
+    return List<String>.from(jsonDecode(response.body) as List)
+        .map((time) => time.substring(0, 5))
+        .toList();
+  }
+
+  Future<AppointmentData> createAppointment(AppointmentData appointment) async {
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/public/appointments?barberId=$barberId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'customerName': appointment.name,
+        'customerPhone': appointment.phone,
+        'serviceIds': appointment.serviceIds,
+        'appointmentDateTime': _isoLocal(appointment.appointmentDateTime!),
+        if (appointment.notes?.isNotEmpty == true) 'notes': appointment.notes,
+      }),
+    );
+    _ensureSuccess(response, expectedStatus: 201);
+    return AppointmentData.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>)
+      ..name = appointment.name
+      ..phone = appointment.phone
+      ..services = appointment.services
+      ..whatsappNotifications = appointment.whatsappNotifications;
+  }
+
+  Future<List<AppointmentData>> appointments(String phone) async {
+    final response = await _client.get(Uri.parse(
+        '$apiBaseUrl/api/public/appointments?phone=${Uri.encodeQueryComponent(phone)}'));
+    return _list(response, AppointmentData.fromJson);
+  }
+
+  Future<void> cancelAppointment(String cancelToken) async {
+    final response = await _client
+        .delete(Uri.parse('$apiBaseUrl/api/public/appointments/$cancelToken'));
+    _ensureSuccess(response, expectedStatus: 204);
+  }
+
+  Future<void> enableTestPush(String customerId) async {
+    final keyResponse =
+        await _client.get(Uri.parse('$apiBaseUrl/api/dev/push/public-key'));
+    _ensureSuccess(keyResponse);
+    final publicKey = (jsonDecode(keyResponse.body)
+        as Map<String, dynamic>)['publicKey'] as String;
+    final subscription = await _createPushSubscription(publicKey);
+    final keys = subscription['keys'] as Map<String, dynamic>;
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/dev/push/subscription'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'endpoint': subscription['endpoint'],
+        'p256dh': keys['p256dh'],
+        'auth': keys['auth'],
+        'customerId': customerId,
+      }),
+    );
+    _ensureSuccess(response, expectedStatus: 204);
+  }
+
+  Future<AvailabilityInterest> createAvailabilityInterest(
+      String customerId, String appointmentId) async {
+    final response = await _client.post(
+      Uri.parse(
+          '$apiBaseUrl/api/v1/customers/$customerId/availability-interests'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'appointmentId': appointmentId}),
+    );
+    _ensureSuccess(response, expectedStatus: 201);
+    return AvailabilityInterest.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<AvailabilityInterest?> activeAvailabilityInterest(
+      String customerId, String appointmentId) async {
+    final response = await _client.get(Uri.parse(
+        '$apiBaseUrl/api/v1/customers/$customerId/availability-interests/active?appointmentId=$appointmentId'));
+    if (response.statusCode == 204) return null;
+    _ensureSuccess(response);
+    return AvailabilityInterest.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> cancelAvailabilityInterest(
+      String customerId, String interestId) async {
+    final response = await _client.delete(Uri.parse(
+        '$apiBaseUrl/api/v1/customers/$customerId/availability-interests/$interestId'));
+    _ensureSuccess(response, expectedStatus: 204);
+  }
+
+  Future<List<AvailabilityOpportunity>> availabilityOpportunities(
+      String customerId, String interestId) async {
+    final response = await _client.get(Uri.parse(
+        '$apiBaseUrl/api/v1/customers/$customerId/availability-interests/$interestId/opportunities'));
+    return _list(response, AvailabilityOpportunity.fromJson);
+  }
+
+  Future<AvailabilityInterest> acceptAvailabilityOpportunity(
+      String customerId, String interestId, String availableSlotId) async {
+    final response = await _client.post(
+      Uri.parse(
+          '$apiBaseUrl/api/v1/customers/$customerId/availability-interests/$interestId/accept'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'availableSlotId': availableSlotId}),
+    );
+    _ensureSuccess(response);
+    return AvailabilityInterest.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  List<T> _list<T>(
+      http.Response response, T Function(Map<String, dynamic>) fromJson) {
+    _ensureSuccess(response);
+    return (jsonDecode(response.body) as List)
+        .map((item) => fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  void _ensureSuccess(http.Response response, {int? expectedStatus}) {
+    if (response.statusCode == (expectedStatus ?? 200)) return;
+    final body = jsonDecode(response.body.isEmpty ? '{}' : response.body);
+    throw BarberApiException(body is Map && body['message'] is String
+        ? body['message'] as String
+        : body is Map && body['error'] is String
+            ? body['error'] as String
+            : 'Não foi possível concluir a operação.');
+  }
+
+  bool _isNoWorkingDay(String body) {
+    final json = jsonDecode(body);
+    return json is Map && json['error'] == 'Barbeiro não atende neste dia.';
+  }
+
+  String _isoLocal(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}T${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:${value.second.toString().padLeft(2, '0')}';
+}

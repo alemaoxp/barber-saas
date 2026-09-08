@@ -25,6 +25,14 @@ spring:
 server:
   port: 8080
 
+# Development-only Web Push probe. Never enable these endpoints in production.
+push:
+  test:
+    enabled: ${PUSH_TEST_ENABLED:false}
+    vapid-public-key: ${PUSH_TEST_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${PUSH_TEST_VAPID_PRIVATE_KEY:}
+    vapid-subject: ${PUSH_TEST_VAPID_SUBJECT:mailto:dev@localhost}
+
 logging:
   level:
     org.hibernate.SQL: DEBUG

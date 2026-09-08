@@ -6,9 +6,12 @@ import com.barbersaas.appointments.dto.PublicAppointmentResponse;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
 import com.barbersaas.appointments.enums.AppointmentStatus;
+import com.barbersaas.appointments.event.AvailableSlotCreatedEvent;
 import com.barbersaas.appointments.mapper.AppointmentMapper;
 import com.barbersaas.appointments.repository.AppointmentRepository;
 import com.barbersaas.availableslot.service.AvailableSlotService;
+import com.barbersaas.availableslot.entity.AvailableSlotEntity;
+import com.barbersaas.availableslot.enums.AvailableSlotStatus;
 import com.barbersaas.barbers.entity.BarberEntity;
 import com.barbersaas.barbers.repository.BarberRepository;
 import com.barbersaas.customers.entity.CustomerEntity;
@@ -22,6 +25,7 @@ import com.barbersaas.services.repository.ServiceRepository;
 import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
 import com.barbersaas.weeklyschedule.service.WeeklyScheduleService;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -48,6 +52,7 @@ public class AppointmentService {
     private final ScheduleBlockService scheduleBlockService;
     private final WeeklyScheduleService weeklyScheduleService;
     private final AvailableSlotService availableSlotService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
@@ -57,7 +62,8 @@ public class AppointmentService {
             AppointmentMapper appointmentMapper,
             ScheduleBlockService scheduleBlockService,
             WeeklyScheduleService weeklyScheduleService,
-            AvailableSlotService availableSlotService) {
+            AvailableSlotService availableSlotService,
+            ApplicationEventPublisher eventPublisher) {
 
         this.appointmentRepository = appointmentRepository;
         this.customerRepository = customerRepository;
@@ -67,6 +73,7 @@ public class AppointmentService {
         this.scheduleBlockService = scheduleBlockService;
         this.weeklyScheduleService = weeklyScheduleService;
         this.availableSlotService = availableSlotService;
+        this.eventPublisher = eventPublisher;
     }
 
     private BarberEntity findBarber(UUID barberId) {
@@ -618,9 +625,14 @@ public class AppointmentService {
                 appointment
         );
 
-        availableSlotService.registerAvailableSlot(
+        AvailableSlotEntity availableSlot = availableSlotService.registerAvailableSlot(
                 barber,
                 canceledDateTime
         );
+
+        if (availableSlot.getStatus() == AvailableSlotStatus.AVAILABLE) {
+            eventPublisher.publishEvent(new AvailableSlotCreatedEvent(
+                    barber.getId(), canceledDateTime));
+        }
     }
 }

@@ -291,6 +291,27 @@ class AvailabilityInterestServiceTest {
                 );
     }
 
+    @Test
+    void findActiveShouldReturnTheCustomersActiveInterestForAppointment() {
+        when(availabilityInterestRepository
+                .findByCustomerIdAndAppointmentIdAndStatus(
+                        CUSTOMER_ID,
+                        APPOINTMENT_ID,
+                        AvailabilityInterestStatus.ACTIVE
+                )).thenReturn(Optional.of(interest));
+
+        Optional<AvailabilityInterestResponse> response =
+                availabilityInterestService.findActive(
+                        CUSTOMER_ID,
+                        APPOINTMENT_ID
+                );
+
+        assertTrue(response.isPresent());
+        assertEquals(INTEREST_ID, response.get().getId());
+        assertEquals(AvailabilityInterestStatus.ACTIVE,
+                response.get().getStatus());
+    }
+
     private CustomerEntity customer() {
         CustomerEntity entity = new CustomerEntity(
                 "Cliente",

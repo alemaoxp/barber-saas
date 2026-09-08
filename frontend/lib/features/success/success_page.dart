@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import '../appointments/appointments_page.dart';
-import '../../services/appointment_store.dart';
 import '../../models/appointment_data.dart';
 
 
@@ -18,10 +17,6 @@ class SuccessPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    AppointmentStore.instance.addIfNotExists(
-      appointment,
-    );
-
     return Scaffold(
       backgroundColor:
       const Color(0xFF020609),

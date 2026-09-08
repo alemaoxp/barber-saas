@@ -43,3 +43,5 @@ graphify-out/
 frontend/macos/DerivedData/
 frontend/.ai/
 backend/docs/codex-last-report.md
+backend/.env
+backend/.env.local

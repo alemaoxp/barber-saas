@@ -4,14 +4,23 @@ import 'package:flutter/material.dart';
 
 import '../success/success_page.dart';
 import '../../models/appointment_data.dart';
+import '../../services/barber_api.dart';
 
-class ConfirmationPage extends StatelessWidget {
+class ConfirmationPage extends StatefulWidget {
   final AppointmentData appointment;
 
   const ConfirmationPage({
     super.key,
     required this.appointment,
   });
+
+  @override
+  State<ConfirmationPage> createState() => _ConfirmationPageState();
+}
+
+class _ConfirmationPageState extends State<ConfirmationPage> {
+  final BarberApi _api = BarberApi();
+  bool _submitting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -291,9 +300,9 @@ class ConfirmationPage extends StatelessWidget {
 
   Widget _buildConfirmationCard() {
     final servicesText =
-    appointment.services.isEmpty
+    widget.appointment.services.isEmpty
         ? 'Nenhum serviço'
-        : appointment.services.join(' + ');
+        : widget.appointment.services.join(' + ');
 
     return Container(
       width: double.infinity,
@@ -367,7 +376,7 @@ class ConfirmationPage extends StatelessWidget {
             label: 'Data',
 
             value:
-            appointment.date,
+            widget.appointment.date,
           ),
 
           _buildDivider(),
@@ -383,7 +392,7 @@ class ConfirmationPage extends StatelessWidget {
             label: 'Horário',
 
             value:
-            appointment.time,
+            widget.appointment.time,
           ),
 
           _buildDivider(),
@@ -397,7 +406,7 @@ class ConfirmationPage extends StatelessWidget {
             Icons.content_cut_rounded,
 
             label:
-            appointment.services.length > 1
+            widget.appointment.services.length > 1
                 ? 'Serviços'
                 : 'Serviço',
 
@@ -418,7 +427,7 @@ class ConfirmationPage extends StatelessWidget {
             label: 'Nome',
 
             value:
-            appointment.name,
+            widget.appointment.name,
           ),
         ],
       ),
@@ -688,10 +697,7 @@ class ConfirmationPage extends StatelessWidget {
 
       child:
       ElevatedButton(
-        onPressed:
-            () => _confirmAppointment(
-          context,
-        ),
+        onPressed: _submitting ? null : _confirmAppointment,
 
         style:
         ElevatedButton.styleFrom(
@@ -721,16 +727,9 @@ class ConfirmationPage extends StatelessWidget {
           ),
         ),
 
-        child:
-        const Text(
-          'Confirmar agendamento',
-
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight:
-            FontWeight.w600,
-          ),
-        ),
+        child: _submitting
+            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Text('Confirmar agendamento', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -739,13 +738,24 @@ class ConfirmationPage extends StatelessWidget {
   // CONFIRMAR
   // =========================================================================
 
-  void _confirmAppointment(BuildContext context) {
-    Navigator.of(context).push(
+  Future<void> _confirmAppointment() async {
+    setState(() => _submitting = true);
+    try {
+      final created = await _api.createAppointment(widget.appointment);
+      if (!mounted) return;
+      Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SuccessPage(
-          appointment: appointment,
+          appointment: created,
         ),
       ),
     );
+    } on BarberApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Falha de rede. Tente novamente.')));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 }

@@ -27,6 +27,13 @@ public interface AvailabilityInterestRepository
             AvailabilityInterestStatus status
     );
 
+    Optional<AvailabilityInterestEntity>
+            findByCustomerIdAndAppointmentIdAndStatus(
+                    UUID customerId,
+                    UUID appointmentId,
+                    AvailabilityInterestStatus status
+            );
+
     boolean existsByCustomerIdAndAppointmentIdAndStatus(
             UUID customerId,
             UUID appointmentId,

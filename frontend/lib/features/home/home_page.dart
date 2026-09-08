@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/appointment_data.dart';
+import '../../services/barber_api.dart';
 import '../service/service_page.dart';
 import '../appointments/appointments_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  HomePage({super.key, BarberApi? api}) : _api = api ?? BarberApi();
+
+  final BarberApi _api;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -19,7 +22,10 @@ class _HomePageState extends State<HomePage> {
 
   int _selectedDay = 0;
 
-  String? _selectedTime = '09:00';
+  String? _selectedTime;
+  List<String> _times = const [];
+  bool _loadingTimes = true;
+  String? _timesError;
 
   final ScrollController _timesScrollController =
   ScrollController();
@@ -89,21 +95,33 @@ class _HomePageState extends State<HomePage> {
   // HORÁRIOS
   // ============================================================
 
-  final List<String> _times = const [
-    '09:00',
-    '10:30',
-    '11:30',
-    '13:00',
-    '14:00',
-    '15:30',
-    '17:00',
-    '18:30',
-    '19:00',
-    '19:30',
-    '20:00',
-    '20:30',
-    '21:00',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadTimes();
+  }
+
+  Future<void> _loadTimes() async {
+    final date = _days[_selectedDay].date;
+    setState(() {
+      _loadingTimes = true;
+      _timesError = null;
+      _selectedTime = null;
+    });
+    try {
+      final times = await widget._api.availableSlots(date);
+      if (!mounted) return;
+      setState(() => _times = times);
+    } on BarberApiException catch (_) {
+      if (!mounted) return;
+      setState(() => _timesError = 'Não foi possível carregar os horários.');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _timesError = 'Não foi possível carregar os horários.');
+    } finally {
+      if (mounted) setState(() => _loadingTimes = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -427,6 +445,7 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedDay = index;
                     });
+                    _loadTimes();
 
                     HapticFeedback
                         .selectionClick();
@@ -665,6 +684,22 @@ class _HomePageState extends State<HomePage> {
   // ============================================================
 
   Widget _buildTimes() {
+    if (_loadingTimes) return const Center(child: CircularProgressIndicator());
+    if (_timesError != null) {
+      return Center(child: TextButton(onPressed: _loadTimes, child: const Text('Não foi possível carregar os horários.\nTentar novamente', textAlign: TextAlign.center)));
+    }
+    if (_times.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Nenhum horário disponível neste dia'),
+            SizedBox(height: 6),
+            Text('Escolha outra data para continuar.'),
+          ],
+        ),
+      );
+    }
     return Scrollbar(
       controller:
       _timesScrollController,
@@ -991,6 +1026,13 @@ class _HomePageState extends State<HomePage> {
       '${selectedDay.day} de ${selectedDay.month} de ${selectedDay.date.year}',
 
       time: _selectedTime!,
+      appointmentDateTime: DateTime(
+        selectedDay.date.year,
+        selectedDay.date.month,
+        selectedDay.date.day,
+        int.parse(_selectedTime!.split(':')[0]),
+        int.parse(_selectedTime!.split(':')[1]),
+      ),
     );
 
     Navigator.of(context).push(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'features/appointments/appointments_page.dart';
 import 'features/home/home_page.dart';
 import 'features/splash/splash_page.dart';
 
@@ -18,15 +19,17 @@ class BarberSaasApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Barber SaaS',
       navigatorKey: navigatorKey,
-      home: SplashPage(
-        onFinished: () {
-          navigatorKey.currentState?.pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const HomePage(),
+      home: Uri.base.queryParameters['screen'] == 'appointments'
+          ? const AppointmentsPage()
+          : SplashPage(
+              onFinished: () {
+                navigatorKey.currentState?.pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => HomePage(),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }
