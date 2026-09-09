@@ -89,6 +89,107 @@ void main() {
     );
   });
 
+  test('consulta daily-agenda administrativo com barberId existente e data',
+      () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'barberId': barberId,
+            'date': '2026-09-09',
+            'workingDay': true,
+            'slots': [],
+          }),
+          200,
+        );
+      }),
+    );
+
+    final agenda = await api.dailyAgenda(DateTime(2026, 9, 9));
+
+    expect(request.method, 'GET');
+    expect(request.url.path, '/api/v1/barbers/$barberId/daily-agenda');
+    expect(request.url.queryParameters['date'], '2026-09-09');
+    expect(agenda.barberId, barberId);
+  });
+
+  test('adminCustomers sem query chama endpoint correto', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('[]', 200);
+      }),
+    );
+
+    final customers = await api.adminCustomers();
+
+    expect(customers, isEmpty);
+    expect(request.method, 'GET');
+    expect(request.url.path, '/api/v1/barbers/$barberId/customers');
+    expect(request.url.query, isEmpty);
+  });
+
+  test('adminCustomers com query envia query corretamente', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('[]', 200);
+      }),
+    );
+
+    await api.adminCustomers(query: ' Gabriel 13 ');
+
+    expect(request.url.path, '/api/v1/barbers/$barberId/customers');
+    expect(request.url.queryParameters['query'], 'Gabriel 13');
+  });
+
+  test('adminCustomers converte JSON para AdminCustomerSummary', () async {
+    final api = BarberApi(
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode([
+            {
+              'id': 'customer-1',
+              'name': 'Gabriel Santana',
+              'phone': '(13) 99999-9999',
+            }
+          ]),
+          200,
+        ),
+      ),
+    );
+
+    final customers = await api.adminCustomers();
+
+    expect(customers.single.id, 'customer-1');
+    expect(customers.single.name, 'Gabriel Santana');
+    expect(customers.single.phone, '(13) 99999-9999');
+  });
+
+  test('adminCustomers mantém tratamento padrão de erro HTTP', () async {
+    final api = BarberApi(
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode({'error': 'Barbeiro não encontrado.'}),
+          404,
+        ),
+      ),
+    );
+
+    await expectLater(
+      api.adminCustomers(),
+      throwsA(isA<BarberApiException>().having(
+        (error) => error.message,
+        'message',
+        'Barbeiro não encontrado.',
+      )),
+    );
+  });
+
   test('trata o retorno de dia sem expediente como lista vazia', () async {
     final api = BarberApi(
       client: MockClient(

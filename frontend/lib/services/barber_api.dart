@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import '../models/appointment_data.dart';
 import '../models/availability_interest.dart';
 import '../models/booking_service.dart';
+import '../features/admin/daily_agenda/daily_agenda_models.dart';
+import '../features/admin/daily_agenda/models/admin_customer_summary.dart';
 import 'push_test_client.dart';
 
 const apiBaseUrl = 'http://localhost:8080';
@@ -35,8 +37,7 @@ class BarberApi {
   }
 
   Future<List<String>> availableSlots(DateTime date) async {
-    final day =
-        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final day = _dateOnly(date);
     final response = await _client.get(Uri.parse(
         '$apiBaseUrl/api/public/barbers/$barberId/available-slots?date=$day'));
     if (response.statusCode == 400 && _isNoWorkingDay(response.body)) {
@@ -46,6 +47,26 @@ class BarberApi {
     return List<String>.from(jsonDecode(response.body) as List)
         .map((time) => time.substring(0, 5))
         .toList();
+  }
+
+  Future<DailyAgendaResponse> dailyAgenda(DateTime date) async {
+    final day = _dateOnly(date);
+    final response = await _client.get(Uri.parse(
+        '$apiBaseUrl/api/v1/barbers/$barberId/daily-agenda?date=$day'));
+    _ensureSuccess(response);
+    return DailyAgendaResponse.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<List<AdminCustomerSummary>> adminCustomers({String? query}) async {
+    final trimmed = query?.trim();
+    final uri = Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers')
+        .replace(
+            queryParameters: trimmed == null || trimmed.isEmpty
+                ? null
+                : {'query': trimmed});
+    final response = await _client.get(uri);
+    return _list(response, AdminCustomerSummary.fromJson);
   }
 
   Future<AppointmentData> createAppointment(AppointmentData appointment) async {
@@ -176,5 +197,8 @@ class BarberApi {
   }
 
   String _isoLocal(DateTime value) =>
-      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}T${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:${value.second.toString().padLeft(2, '0')}';
+      '${_dateOnly(value)}T${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}:${value.second.toString().padLeft(2, '0')}';
+
+  String _dateOnly(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
