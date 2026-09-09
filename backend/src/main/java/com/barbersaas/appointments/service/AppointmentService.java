@@ -2,6 +2,11 @@ package com.barbersaas.appointments.service;
 
 import com.barbersaas.appointments.dto.AppointmentResponse;
 import com.barbersaas.appointments.dto.CreateAppointmentRequest;
+import com.barbersaas.appointments.dto.DailyAgendaBlockSummary;
+import com.barbersaas.appointments.dto.DailyAgendaCustomerSummary;
+import com.barbersaas.appointments.dto.DailyAgendaResponse;
+import com.barbersaas.appointments.dto.DailyAgendaServiceSummary;
+import com.barbersaas.appointments.dto.DailyAgendaSlotResponse;
 import com.barbersaas.appointments.dto.PublicAppointmentResponse;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
@@ -37,6 +42,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -291,6 +298,177 @@ public class AppointmentService {
                     return true;
                 })
                 .collect(Collectors.toList());
+    }
+
+    public DailyAgendaResponse getDailyAgenda(
+            UUID barberId,
+            LocalDate date) {
+
+        findBarber(barberId);
+
+        WeeklyScheduleEntity schedule =
+                weeklyScheduleService.getSchedule(
+                        barberId,
+                        date.getDayOfWeek()
+                );
+
+        if (!schedule.isWorkingDay()) {
+            return new DailyAgendaResponse(
+                    barberId,
+                    date,
+                    false,
+                    List.of()
+            );
+        }
+
+        int intervalMinutes =
+                getAppointmentIntervalMinutes(
+                        date.getDayOfWeek()
+                );
+
+        List<LocalTime> allSlots =
+                generateTimeSlots(
+                        schedule.getStartTime(),
+                        schedule.getEndTime(),
+                        intervalMinutes,
+                        schedule.getBreakStartTime(),
+                        schedule.getBreakEndTime()
+                );
+
+        LocalDateTime startOfDay =
+                date.atStartOfDay();
+
+        LocalDateTime endOfDay =
+                date.atTime(LocalTime.MAX);
+
+        Map<LocalDateTime, AppointmentEntity> appointmentsByDateTime =
+                appointmentRepository
+                        .findByBarberIdAndAppointmentDateTimeBetween(
+                                barberId,
+                                startOfDay,
+                                endOfDay
+                        )
+                        .stream()
+                        .filter(appointment ->
+                                appointment.getStatus()
+                                        != AppointmentStatus.CANCELED)
+                        .collect(Collectors.toMap(
+                                AppointmentEntity::getAppointmentDateTime,
+                                appointment -> appointment,
+                                (first, ignored) -> first
+                        ));
+
+        List<ScheduleBlockEntity> blocks =
+                scheduleBlockService.findBlocksByDate(
+                        barberId,
+                        date
+                );
+
+        List<DailyAgendaSlotResponse> slots =
+                allSlots.stream()
+                        .map(slotTime -> dailyAgendaSlot(
+                                date,
+                                slotTime,
+                                intervalMinutes,
+                                appointmentsByDateTime,
+                                blocks
+                        ))
+                        .toList();
+
+        return new DailyAgendaResponse(
+                barberId,
+                date,
+                true,
+                slots
+        );
+    }
+
+    private DailyAgendaSlotResponse dailyAgendaSlot(
+            LocalDate date,
+            LocalTime slotTime,
+            int intervalMinutes,
+            Map<LocalDateTime, AppointmentEntity> appointmentsByDateTime,
+            List<ScheduleBlockEntity> blocks) {
+
+        LocalDateTime slotDateTime =
+                LocalDateTime.of(
+                        date,
+                        slotTime
+                );
+
+        AppointmentEntity appointment =
+                appointmentsByDateTime.get(slotDateTime);
+
+        if (appointment != null) {
+            return dailyAgendaOccupiedSlot(
+                    slotDateTime,
+                    appointment
+            );
+        }
+
+        Optional<ScheduleBlockEntity> block =
+                blocks.stream()
+                        .filter(candidate ->
+                                overlaps(
+                                        slotDateTime,
+                                        slotDateTime.plusMinutes(intervalMinutes),
+                                        candidate.getStartDateTime(),
+                                        candidate.getEndDateTime()
+                                ))
+                        .findFirst();
+
+        if (block.isPresent()) {
+            return DailyAgendaSlotResponse.blocked(
+                    slotDateTime,
+                    new DailyAgendaBlockSummary(
+                            block.get().getId(),
+                            block.get().getStartDateTime(),
+                            block.get().getEndDateTime(),
+                            block.get().getReason()
+                    )
+            );
+        }
+
+        return DailyAgendaSlotResponse.free(slotDateTime);
+    }
+
+    private DailyAgendaSlotResponse dailyAgendaOccupiedSlot(
+            LocalDateTime slotDateTime,
+            AppointmentEntity appointment) {
+
+        CustomerEntity customer =
+                appointment.getCustomer();
+
+        List<DailyAgendaServiceSummary> services =
+                appointment.getServices()
+                        .stream()
+                        .map(service -> new DailyAgendaServiceSummary(
+                                service.getId(),
+                                service.getName()
+                        ))
+                        .toList();
+
+        return DailyAgendaSlotResponse.occupied(
+                slotDateTime,
+                appointment.getId(),
+                appointment.getStatus(),
+                new DailyAgendaCustomerSummary(
+                        customer.getId(),
+                        customer.getName()
+                ),
+                services,
+                appointment.getTotalPrice()
+        );
+    }
+
+    private boolean overlaps(
+            LocalDateTime firstStart,
+            LocalDateTime firstEnd,
+            LocalDateTime secondStart,
+            LocalDateTime secondEnd) {
+
+        return firstStart.isBefore(secondEnd)
+                && firstEnd.isAfter(secondStart);
     }
 
     private boolean isInsideBreak(

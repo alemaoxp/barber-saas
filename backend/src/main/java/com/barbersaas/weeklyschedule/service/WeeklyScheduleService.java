@@ -145,6 +145,19 @@ public class WeeklyScheduleService {
         );
     }
 
+    public WeeklyScheduleEntity getSchedule(
+            UUID barberId,
+            DayOfWeek dayOfWeek) {
+
+        BarberScheduleEntity barberSchedule =
+                findBarberSchedule(barberId);
+
+        return findWeeklyScheduleForDay(
+                barberSchedule.getId(),
+                dayOfWeek
+        );
+    }
+
     private BarberScheduleEntity findBarberSchedule(UUID barberId) {
         return barberScheduleRepository.findByBarberId(barberId)
                 .orElseThrow(() ->

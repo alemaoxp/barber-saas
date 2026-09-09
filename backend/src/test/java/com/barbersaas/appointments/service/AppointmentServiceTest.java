@@ -1,6 +1,8 @@
 package com.barbersaas.appointments.service;
 
 import com.barbersaas.appointments.dto.CreateAppointmentRequest;
+import com.barbersaas.appointments.dto.DailyAgendaResponse;
+import com.barbersaas.appointments.dto.DailyAgendaSlotStatus;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
 import com.barbersaas.appointments.enums.AppointmentStatus;
@@ -37,8 +39,11 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -545,6 +550,230 @@ class AppointmentServiceTest {
         org.junit.jupiter.api.Assertions.assertFalse(slots.contains(LocalTime.of(10, 0)));
     }
 
+    @Test
+    void dailyAgendaShouldReturnFreeAndOccupiedSlots() {
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        AppointmentEntity appointment =
+                existingAppointment(
+                        wednesday.atTime(10, 0),
+                        AppointmentStatus.SCHEDULED,
+                        List.of(service40Minutes),
+                        BigDecimal.valueOf(50)
+                );
+        ReflectionTestUtils.setField(appointment, "id", APPOINTMENT_ID);
+
+        mockWorkingDay(wednesday, LocalTime.of(9, 30), LocalTime.of(10, 30));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(wednesday.atStartOfDay()),
+                eq(wednesday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of(appointment));
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
+                .thenReturn(List.of());
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, wednesday);
+
+        assertTrue(response.isWorkingDay());
+        assertEquals(5, response.getSlots().size());
+        assertEquals(DailyAgendaSlotStatus.FREE, response.getSlots().get(0).getStatus());
+        assertEquals(DailyAgendaSlotStatus.OCCUPIED, response.getSlots().get(1).getStatus());
+        assertEquals(APPOINTMENT_ID, response.getSlots().get(1).getAppointmentId());
+        assertEquals(CUSTOMER_ID, response.getSlots().get(1).getCustomer().getId());
+        assertEquals("Cliente", response.getSlots().get(1).getCustomer().getName());
+    }
+
+    @Test
+    void dailyAgendaShouldReturnBlockedSlotFromScheduleBlock() {
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        ScheduleBlockEntity block =
+                scheduleBlock(
+                        wednesday.atTime(10, 0),
+                        wednesday.atTime(10, 30)
+                );
+        UUID blockId =
+                UUID.fromString("00000000-0000-0000-0000-000000000006");
+        ReflectionTestUtils.setField(block, "id", blockId);
+
+        mockWorkingDay(wednesday, LocalTime.of(9, 30), LocalTime.of(10, 30));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(wednesday.atStartOfDay()),
+                eq(wednesday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of());
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
+                .thenReturn(List.of(block));
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, wednesday);
+
+        assertEquals(DailyAgendaSlotStatus.BLOCKED, response.getSlots().get(1).getStatus());
+        assertEquals(blockId, response.getSlots().get(1).getBlock().getId());
+        assertEquals("Bloqueio", response.getSlots().get(1).getBlock().getReason());
+    }
+
+    @Test
+    void dailyAgendaShouldNotOccupyCanceledAppointmentSlot() {
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        AppointmentEntity appointment =
+                existingAppointment(
+                        wednesday.atTime(10, 0),
+                        AppointmentStatus.CANCELED,
+                        List.of(service40Minutes),
+                        BigDecimal.valueOf(50)
+                );
+
+        mockWorkingDay(wednesday, LocalTime.of(9, 30), LocalTime.of(10, 30));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(wednesday.atStartOfDay()),
+                eq(wednesday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of(appointment));
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
+                .thenReturn(List.of());
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, wednesday);
+
+        assertEquals(DailyAgendaSlotStatus.FREE, response.getSlots().get(1).getStatus());
+        assertNull(response.getSlots().get(1).getAppointmentId());
+    }
+
+    @Test
+    void dailyAgendaShouldReturnMultipleServicesAndTotalPrice() {
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        AppointmentEntity appointment =
+                existingAppointment(
+                        wednesday.atTime(9, 30),
+                        AppointmentStatus.SCHEDULED,
+                        List.of(service40Minutes, service30Minutes),
+                        BigDecimal.valueOf(80)
+                );
+
+        mockWorkingDay(wednesday, LocalTime.of(9, 30), LocalTime.of(9, 30));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(wednesday.atStartOfDay()),
+                eq(wednesday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of(appointment));
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
+                .thenReturn(List.of());
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, wednesday);
+
+        assertEquals(2, response.getSlots().get(0).getServices().size());
+        assertEquals(SERVICE_ID, response.getSlots().get(0).getServices().get(0).getId());
+        assertEquals(SECOND_SERVICE_ID, response.getSlots().get(0).getServices().get(1).getId());
+        assertEquals(BigDecimal.valueOf(80), response.getSlots().get(0).getTotalPrice());
+    }
+
+    @Test
+    void dailyAgendaShouldKeepMondayFortyMinuteCadence() {
+        LocalDate monday = LocalDate.of(2026, 8, 31);
+        mockWorkingDay(monday, LocalTime.of(9, 30), LocalTime.of(10, 50));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(monday.atStartOfDay()),
+                eq(monday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of());
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, monday))
+                .thenReturn(List.of());
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, monday);
+
+        assertEquals(
+                List.of(
+                        monday.atTime(9, 30),
+                        monday.atTime(10, 10),
+                        monday.atTime(10, 50),
+                        monday.atTime(11, 30)
+                ),
+                response.getSlots().stream()
+                        .map(slot -> slot.getDateTime())
+                        .toList()
+        );
+    }
+
+    @Test
+    void dailyAgendaShouldKeepOtherWorkingDaysThirtyMinuteCadence() {
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        mockWorkingDay(wednesday, LocalTime.of(9, 30), LocalTime.of(10, 30));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(wednesday.atStartOfDay()),
+                eq(wednesday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of());
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
+                .thenReturn(List.of());
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, wednesday);
+
+        assertEquals(
+                List.of(
+                        wednesday.atTime(9, 30),
+                        wednesday.atTime(10, 0),
+                        wednesday.atTime(10, 30),
+                        wednesday.atTime(11, 0),
+                        wednesday.atTime(11, 30)
+                ),
+                response.getSlots().stream()
+                        .map(slot -> slot.getDateTime())
+                        .toList()
+        );
+    }
+
+    @Test
+    void dailyAgendaShouldNotReturnLunchSlots() {
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        mockWorkingDay(wednesday, LocalTime.of(11, 30), LocalTime.of(14, 30));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(wednesday.atStartOfDay()),
+                eq(wednesday.atTime(LocalTime.MAX))
+        )).thenReturn(List.of());
+        when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
+                .thenReturn(List.of());
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, wednesday);
+
+        assertEquals(
+                List.of(
+                        wednesday.atTime(11, 30),
+                        wednesday.atTime(14, 0),
+                        wednesday.atTime(14, 30)
+                ),
+                response.getSlots().stream()
+                        .map(slot -> slot.getDateTime())
+                        .toList()
+        );
+    }
+
+    @Test
+    void dailyAgendaShouldReturnEmptySlotsForNonWorkingDay() {
+        LocalDate tuesday = LocalDate.of(2026, 9, 1);
+        WeeklyScheduleEntity schedule =
+                workingSchedule(
+                        DayOfWeek.TUESDAY,
+                        null,
+                        null
+                );
+        schedule.setWorkingDay(false);
+        when(weeklyScheduleService.getSchedule(BARBER_ID, DayOfWeek.TUESDAY))
+                .thenReturn(schedule);
+
+        DailyAgendaResponse response =
+                appointmentService.getDailyAgenda(BARBER_ID, tuesday);
+
+        assertFalse(response.isWorkingDay());
+        assertEquals(List.of(), response.getSlots());
+        verify(appointmentRepository, never())
+                .findByBarberIdAndAppointmentDateTimeBetween(any(), any(), any());
+    }
+
     private void assertCreateAllowed(LocalDateTime dateTime) {
         assertDoesNotThrow(() -> createAt(dateTime));
     }
@@ -640,6 +869,36 @@ class AppointmentServiceTest {
                 startDateTime,
                 endDateTime,
                 "Bloqueio"
+        );
+    }
+
+    private void mockWorkingDay(
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime) {
+
+        when(weeklyScheduleService.getSchedule(BARBER_ID, date.getDayOfWeek()))
+                .thenReturn(workingSchedule(
+                        date.getDayOfWeek(),
+                        startTime,
+                        endTime
+                ));
+    }
+
+    private AppointmentEntity existingAppointment(
+            LocalDateTime dateTime,
+            AppointmentStatus status,
+            List<ServiceEntity> services,
+            BigDecimal totalPrice) {
+
+        return new AppointmentEntity(
+                customer,
+                barber,
+                services,
+                totalPrice,
+                dateTime,
+                status,
+                null
         );
     }
 }
