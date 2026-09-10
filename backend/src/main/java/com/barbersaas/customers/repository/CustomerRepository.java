@@ -11,30 +11,28 @@ import java.util.UUID;
 
 @Repository
 public interface CustomerRepository extends JpaRepository<CustomerEntity, UUID> {
-    java.util.Optional<CustomerEntity> findByPhone(String phone);
+    java.util.Optional<CustomerEntity> findByBarbershopIdAndPhone(UUID barbershopId, String phone);
 
     @Query("""
             SELECT DISTINCT c
-            FROM AppointmentEntity a
-            JOIN a.customer c
-            WHERE a.barber.id = :barberId
+            FROM CustomerEntity c
+            WHERE c.barbershop.id = :barbershopId
             """)
     List<CustomerEntity> findDistinctByBarberId(
-            @Param("barberId") UUID barberId
+            @Param("barbershopId") UUID barbershopId
     );
 
     @Query("""
             SELECT DISTINCT c
-            FROM AppointmentEntity a
-            JOIN a.customer c
-            WHERE a.barber.id = :barberId
+            FROM CustomerEntity c
+            WHERE c.barbershop.id = :barbershopId
             AND (
                 LOWER(c.name) LIKE LOWER(:queryPattern)
                 OR c.phone LIKE :queryPattern
             )
             """)
     List<CustomerEntity> findDistinctByBarberIdAndQuery(
-            @Param("barberId") UUID barberId,
+            @Param("barbershopId") UUID barbershopId,
             @Param("queryPattern") String queryPattern
     );
 }

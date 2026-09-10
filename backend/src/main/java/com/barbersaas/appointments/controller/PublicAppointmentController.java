@@ -36,8 +36,8 @@ public class PublicAppointmentController {
     }
 
     @GetMapping
-    public List<PublicAppointmentResponse> findAppointments(@RequestParam String phone) {
-        return publicAppointmentService.findPublicAppointments(phone);
+    public List<PublicAppointmentResponse> findAppointments(@RequestParam UUID barberId, @RequestParam String phone) {
+        return publicAppointmentService.findPublicAppointments(barberId, phone);
     }
 
     @DeleteMapping("/{token}")

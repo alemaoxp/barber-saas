@@ -11,6 +11,7 @@ import com.barbersaas.appointments.repository.AppointmentRepository;
 import com.barbersaas.availableslot.service.AvailableSlotService;
 import com.barbersaas.barbers.entity.BarberEntity;
 import com.barbersaas.barbers.repository.BarberRepository;
+import com.barbersaas.barbershops.entity.BarbershopEntity;
 import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.customers.repository.CustomerRepository;
 import com.barbersaas.exception.BusinessException;
@@ -55,6 +56,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceTest {
+    private static final UUID BARBERSHOP_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
 
     private static final UUID BARBER_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -799,6 +801,7 @@ class AppointmentServiceTest {
                 true
         );
         ReflectionTestUtils.setField(entity, "id", BARBER_ID);
+        entity.setBarbershop(new BarbershopEntity(BARBERSHOP_ID, "Jhow Cortes", true));
         return entity;
     }
 
@@ -812,6 +815,7 @@ class AppointmentServiceTest {
                 true
         );
         ReflectionTestUtils.setField(entity, "id", CUSTOMER_ID);
+        entity.setBarbershop(new BarbershopEntity(BARBERSHOP_ID, "Jhow Cortes", true));
         return entity;
     }
 
@@ -824,6 +828,7 @@ class AppointmentServiceTest {
                 true
         );
         ReflectionTestUtils.setField(entity, "id", id);
+        entity.setBarbershop(new BarbershopEntity(BARBERSHOP_ID, "Jhow Cortes", true));
         return entity;
     }
 

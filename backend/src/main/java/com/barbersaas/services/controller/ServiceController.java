@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/services")
+@RequestMapping("/api/v1/barbers/{barberId}/services")
 public class ServiceController {
 
     private final ServiceService serviceService;
@@ -23,34 +23,34 @@ public class ServiceController {
     }
 
     @PostMapping
-    public ResponseEntity<ServiceResponse> create(@Valid @RequestBody CreateServiceRequest request) {
-        ServiceResponse response = serviceService.create(request);
+    public ResponseEntity<ServiceResponse> create(@PathVariable UUID barberId, @Valid @RequestBody CreateServiceRequest request) {
+        ServiceResponse response = serviceService.create(barberId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<ServiceResponse>> findAll() {
-        List<ServiceResponse> responses = serviceService.findAll();
+    public ResponseEntity<List<ServiceResponse>> findAll(@PathVariable UUID barberId) {
+        List<ServiceResponse> responses = serviceService.findAll(barberId);
         return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ServiceResponse> findById(@PathVariable UUID id) {
-        ServiceResponse response = serviceService.findById(id);
+    public ResponseEntity<ServiceResponse> findById(@PathVariable UUID barberId, @PathVariable UUID id) {
+        ServiceResponse response = serviceService.findById(barberId, id);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ServiceResponse> update(
-            @PathVariable UUID id,
+            @PathVariable UUID barberId, @PathVariable UUID id,
             @Valid @RequestBody UpdateServiceRequest request) {
-        ServiceResponse response = serviceService.update(id, request);
+        ServiceResponse response = serviceService.update(barberId, id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        serviceService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable UUID barberId, @PathVariable UUID id) {
+        serviceService.delete(barberId, id);
         return ResponseEntity.noContent().build();
     }
 }

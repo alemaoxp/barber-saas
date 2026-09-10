@@ -77,16 +77,35 @@ void main() {
   });
 
   test('normaliza horários públicos sem alterar a grade', () async {
+    late http.Request request;
     final api = BarberApi(
-      client: MockClient(
-        (_) async => http.Response('["09:00:00", "10:30:00"]', 200),
-      ),
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('["09:00:00", "10:30:00"]', 200);
+      }),
     );
 
     expect(
       await api.availableSlots(DateTime(2026, 9, 9)),
       ['09:00', '10:30'],
     );
+    expect(request.url.path, '/api/public/barbers/$barberId/available-slots');
+  });
+
+  test('consulta meus agendamentos no contexto do barber', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('[]', 200);
+      }),
+    );
+
+    await api.appointments('(11) 99999-9999');
+
+    expect(request.url.path, '/api/public/appointments');
+    expect(request.url.queryParameters['barberId'], barberId);
+    expect(request.url.queryParameters['phone'], '(11) 99999-9999');
   });
 
   test('consulta daily-agenda administrativo com barberId existente e data',

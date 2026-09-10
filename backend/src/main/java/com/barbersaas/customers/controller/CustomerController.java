@@ -9,11 +9,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/customers")
+@RequestMapping("/api/v1/barbers/{barberId}/customers")
 public class CustomerController {
 
     private final CustomerService customerService;
@@ -23,34 +22,28 @@ public class CustomerController {
     }
 
     @PostMapping
-    public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CreateCustomerRequest request) {
-        CustomerResponse response = customerService.create(request);
+    public ResponseEntity<CustomerResponse> create(@PathVariable UUID barberId, @Valid @RequestBody CreateCustomerRequest request) {
+        CustomerResponse response = customerService.create(barberId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping
-    public ResponseEntity<List<CustomerResponse>> findAll() {
-        List<CustomerResponse> responses = customerService.findAll();
-        return ResponseEntity.ok(responses);
-    }
-
     @GetMapping("/{id}")
-    public ResponseEntity<CustomerResponse> findById(@PathVariable UUID id) {
-        CustomerResponse response = customerService.findById(id);
+    public ResponseEntity<CustomerResponse> findById(@PathVariable UUID barberId, @PathVariable UUID id) {
+        CustomerResponse response = customerService.findById(barberId, id);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CustomerResponse> update(
-            @PathVariable UUID id,
+            @PathVariable UUID barberId, @PathVariable UUID id,
             @Valid @RequestBody UpdateCustomerRequest request) {
-        CustomerResponse response = customerService.update(id, request);
+        CustomerResponse response = customerService.update(barberId, id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        customerService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable UUID barberId, @PathVariable UUID id) {
+        customerService.delete(barberId, id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -127,6 +127,7 @@ class PublicAppointmentControllerTest {
     @Test
     void publicAppointmentsShouldExposeCustomerScopedLookup() throws Exception {
         mockMvc.perform(get("/api/public/appointments")
+                        .param("barberId", BARBER_ID.toString())
                         .param("phone", "(11) 97777-1234"))
                 .andExpect(status().isOk());
     }

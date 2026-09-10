@@ -1,6 +1,8 @@
 package com.barbersaas.customers.service;
 
 import com.barbersaas.barbers.repository.BarberRepository;
+import com.barbersaas.barbers.entity.BarberEntity;
+import com.barbersaas.barbershops.entity.BarbershopEntity;
 import com.barbersaas.customers.dto.CustomerSummaryResponse;
 import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.customers.mapper.CustomerMapper;
@@ -15,12 +17,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class CustomerServiceTest {
@@ -47,6 +51,11 @@ class CustomerServiceTest {
                 new CustomerMapper(),
                 barberRepository
         );
+        BarberEntity barber = new BarberEntity("Jhow", "jhow@example.com", "(11) 99999-9999", null, true);
+        BarbershopEntity shop = new BarbershopEntity(BARBER_ID, "Jhow Cortes", true);
+        barber.setBarbershop(shop);
+        lenient().when(barberRepository.existsById(BARBER_ID)).thenReturn(true);
+        lenient().when(barberRepository.findById(BARBER_ID)).thenReturn(Optional.of(barber));
     }
 
     @Test

@@ -30,7 +30,7 @@ void main() {
               ]),
               200);
         }
-        if (request.url.path == '/api/public/services') {
+        if (request.url.path == '/api/public/barbers/$barberId/services') {
           return http.Response('[]', 200);
         }
         if (request.url.path.endsWith('/active')) {

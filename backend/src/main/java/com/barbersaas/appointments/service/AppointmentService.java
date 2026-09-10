@@ -623,6 +623,8 @@ public class AppointmentService {
 
         List<ServiceEntity> services = findServices(request.getServiceIds());
 
+        validateOwnership(barber, customer, services);
+
         validateAvailability(barberId, request.getAppointmentDateTime());
 
         AppointmentEntity entity =
@@ -652,6 +654,14 @@ public class AppointmentService {
                 .map(serviceId -> serviceRepository.findById(serviceId)
                         .orElseThrow(() -> new NotFoundException("Serviço não encontrado.")))
                 .toList();
+    }
+
+    private void validateOwnership(BarberEntity barber, CustomerEntity customer, List<ServiceEntity> services) {
+        UUID barbershopId = barber.getBarbershop().getId();
+        if (!barbershopId.equals(customer.getBarbershop().getId())
+                || services.stream().anyMatch(service -> !barbershopId.equals(service.getBarbershop().getId()))) {
+            throw new BusinessException("Cliente e serviços devem pertencer à mesma barbearia do barbeiro.");
+        }
     }
 
     private BigDecimal totalPrice(List<ServiceEntity> services) {
@@ -725,6 +735,8 @@ public class AppointmentService {
                                 ));
 
         List<ServiceEntity> services = findServices(request.getServiceIds());
+
+        validateOwnership(barber, customer, services);
 
         validateAvailabilityIgnoringAppointment(
                 barberId,

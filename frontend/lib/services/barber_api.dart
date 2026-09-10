@@ -32,7 +32,7 @@ class BarberApi {
 
   Future<List<BookingService>> services() async {
     final response =
-        await _client.get(Uri.parse('$apiBaseUrl/api/public/services'));
+        await _client.get(Uri.parse('$apiBaseUrl/api/public/barbers/$barberId/services'));
     return _list(response, BookingService.fromJson);
   }
 
@@ -92,7 +92,7 @@ class BarberApi {
 
   Future<List<AppointmentData>> appointments(String phone) async {
     final response = await _client.get(Uri.parse(
-        '$apiBaseUrl/api/public/appointments?phone=${Uri.encodeQueryComponent(phone)}'));
+        '$apiBaseUrl/api/public/appointments?barberId=$barberId&phone=${Uri.encodeQueryComponent(phone)}'));
     return _list(response, AppointmentData.fromJson);
   }
 

@@ -4,6 +4,8 @@ import com.barbersaas.appointments.dto.CreatePublicAppointmentRequest;
 import com.barbersaas.appointments.dto.PublicAppointmentResponse;
 import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.customers.repository.CustomerRepository;
+import com.barbersaas.barbers.entity.BarberEntity;
+import com.barbersaas.barbers.repository.BarberRepository;
 import com.barbersaas.exception.BusinessException;
 import com.barbersaas.exception.NotFoundException;
 import org.springframework.stereotype.Service;
@@ -18,17 +20,20 @@ public class PublicAppointmentService {
 
     private final AppointmentService appointmentService;
     private final CustomerRepository customerRepository;
+    private final BarberRepository barberRepository;
 
     public PublicAppointmentService(
             AppointmentService appointmentService,
-            CustomerRepository customerRepository) {
+            CustomerRepository customerRepository, BarberRepository barberRepository) {
         this.appointmentService = appointmentService;
         this.customerRepository = customerRepository;
+        this.barberRepository = barberRepository;
     }
 
     public PublicAppointmentResponse createPublicAppointment(UUID barberId, CreatePublicAppointmentRequest request) {
         // Localizar ou criar o cliente pelo telefone
-        CustomerEntity customer = findOrCreateCustomer(request.getCustomerName(), request.getCustomerPhone());
+        BarberEntity barber = findBarber(barberId);
+        CustomerEntity customer = findOrCreateCustomer(barber, request.getCustomerName(), request.getCustomerPhone());
 
         // Converter para CreateAppointmentRequest e reutilizar o AppointmentService
         return appointmentService.createPublic(
@@ -38,21 +43,26 @@ public class PublicAppointmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<PublicAppointmentResponse> findPublicAppointments(String customerPhone) {
-        return customerRepository.findByPhone(customerPhone)
+    public List<PublicAppointmentResponse> findPublicAppointments(UUID barberId, String customerPhone) {
+        return customerRepository.findByBarbershopIdAndPhone(findBarber(barberId).getBarbershop().getId(), customerPhone)
                 .map(customer -> appointmentService.findPublicByCustomerId(customer.getId()))
                 .orElseGet(List::of);
     }
 
-    private CustomerEntity findOrCreateCustomer(String customerName, String customerPhone) {
+    private BarberEntity findBarber(UUID barberId) {
+        return barberRepository.findById(barberId).orElseThrow(() -> new NotFoundException("Barbeiro não encontrado."));
+    }
+
+    private CustomerEntity findOrCreateCustomer(BarberEntity barber, String customerName, String customerPhone) {
         // Primeiro tenta encontrar pelo telefone
-        return customerRepository.findByPhone(customerPhone)
+        return customerRepository.findByBarbershopIdAndPhone(barber.getBarbershop().getId(), customerPhone)
                 .orElseGet(() -> {
                     // Se não existir, cria um novo cliente
                     CustomerEntity newCustomer = new CustomerEntity();
                     newCustomer.setName(customerName);
                     newCustomer.setPhone(customerPhone);
                     newCustomer.setActive(true);
+                    newCustomer.setBarbershop(barber.getBarbershop());
                     return customerRepository.save(newCustomer);
                 });
     }

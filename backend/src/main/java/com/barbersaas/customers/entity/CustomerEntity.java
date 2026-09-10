@@ -2,6 +2,7 @@ package com.barbersaas.customers.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import com.barbersaas.barbershops.entity.BarbershopEntity;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -39,6 +40,10 @@ public class CustomerEntity {
     @Column(nullable = false)
     private Boolean active;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "barbershop_id", nullable = false)
+    private BarbershopEntity barbershop;
+
     // Constructors
     public CustomerEntity() {
         // Default constructor for JPA
@@ -57,6 +62,9 @@ public class CustomerEntity {
     public UUID getId() {
         return id;
     }
+
+    public BarbershopEntity getBarbershop() { return barbershop; }
+    public void setBarbershop(BarbershopEntity barbershop) { this.barbershop = barbershop; }
 
     public String getName() {
         return name;

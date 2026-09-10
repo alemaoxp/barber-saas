@@ -2,6 +2,7 @@ package com.barbersaas.services.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import com.barbersaas.barbershops.entity.BarbershopEntity;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -38,6 +39,10 @@ public class ServiceEntity {
     @Column(nullable = false)
     private Boolean active;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "barbershop_id", nullable = false)
+    private BarbershopEntity barbershop;
+
     // Constructors
     public ServiceEntity() {
         // Default constructor for JPA
@@ -55,6 +60,9 @@ public class ServiceEntity {
     public UUID getId() {
         return id;
     }
+
+    public BarbershopEntity getBarbershop() { return barbershop; }
+    public void setBarbershop(BarbershopEntity barbershop) { this.barbershop = barbershop; }
 
     public String getName() {
         return name;
