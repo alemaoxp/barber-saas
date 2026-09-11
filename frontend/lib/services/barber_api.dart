@@ -31,9 +31,36 @@ class BarberApi {
       _createPushSubscription;
 
   Future<List<BookingService>> services() async {
-    final response =
-        await _client.get(Uri.parse('$apiBaseUrl/api/public/barbers/$barberId/services'));
+    final response = await _client
+        .get(Uri.parse('$apiBaseUrl/api/public/barbers/$barberId/services'));
     return _list(response, BookingService.fromJson);
+  }
+
+  Future<List<BookingService>> adminServices() async {
+    final response = await _client
+        .get(Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services'));
+    return _list(response, BookingService.fromJson);
+  }
+
+  Future<BookingService> createAdminService({
+    required String name,
+    required double price,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'description': '',
+        'durationMinutes': 30,
+        'price': price,
+        'active': true,
+      }),
+    );
+    _ensureSuccess(response, expectedStatus: 201);
+    return BookingService.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<List<String>> availableSlots(DateTime date) async {
@@ -62,11 +89,39 @@ class BarberApi {
     final trimmed = query?.trim();
     final uri = Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers')
         .replace(
-            queryParameters: trimmed == null || trimmed.isEmpty
-                ? null
-                : {'query': trimmed});
+            queryParameters:
+                trimmed == null || trimmed.isEmpty ? null : {'query': trimmed});
     final response = await _client.get(uri);
     return _list(response, AdminCustomerSummary.fromJson);
+  }
+
+  Future<AdminCustomerSummary> createAdminCustomer({
+    required String name,
+    required String phone,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'phone': phone,
+        'email': null,
+        'birthDate': null,
+        'notes': null,
+        'active': true,
+      }),
+    );
+    _ensureSuccess(response, expectedStatus: 201);
+    return AdminCustomerSummary.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> deleteAdminCustomer(String customerId) async {
+    final response = await _client.delete(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers/$customerId'),
+    );
+    _ensureSuccess(response, expectedStatus: 204);
   }
 
   Future<AppointmentData> createAppointment(AppointmentData appointment) async {
@@ -88,6 +143,33 @@ class BarberApi {
       ..phone = appointment.phone
       ..services = appointment.services
       ..whatsappNotifications = appointment.whatsappNotifications;
+  }
+
+  Future<AppointmentData> createAdminAppointment({
+    required String customerId,
+    required List<String> serviceIds,
+    required DateTime appointmentDateTime,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/appointments'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'customerId': customerId,
+        'serviceIds': serviceIds,
+        'appointmentDateTime': _isoLocal(appointmentDateTime),
+      }),
+    );
+    _ensureSuccess(response, expectedStatus: 201);
+    return AppointmentData.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> deleteAdminService(String serviceId) async {
+    final response = await _client.delete(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services/$serviceId'),
+    );
+    _ensureSuccess(response, expectedStatus: 204);
   }
 
   Future<List<AppointmentData>> appointments(String phone) async {

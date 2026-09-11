@@ -39,7 +39,7 @@ public class ServiceService {
     }
 
     public List<ServiceResponse> findAll(UUID barberId) {
-        return serviceRepository.findByBarbershopId(barber(barberId).getBarbershop().getId())
+        return serviceRepository.findByBarbershopIdAndActiveTrue(barber(barberId).getBarbershop().getId())
                 .stream()
                 .map(serviceMapper::toResponse)
                 .collect(Collectors.toList());
@@ -75,8 +75,9 @@ public class ServiceService {
         ServiceEntity entity = serviceRepository.findById(id)
                 .filter(service -> service.getBarbershop().getId().equals(barber(barberId).getBarbershop().getId()))
                 .orElseThrow(() -> new RuntimeException("Serviço não encontrado."));
-        
-        serviceRepository.delete(entity);
+
+        entity.setActive(false);
+        serviceRepository.save(entity);
     }
 
     private BarberEntity barber(UUID barberId) {

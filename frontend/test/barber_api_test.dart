@@ -76,6 +76,44 @@ void main() {
     expect(appointment.total, 40.0);
   });
 
+  test('createAdminAppointment envia payload administrativo correto', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'id': 'appointment-1',
+            'customerId': 'customer-1',
+            'serviceIds': ['service-1', 'service-2'],
+            'totalPrice': 70,
+            'appointmentDateTime': '2026-09-09T09:30:00',
+            'status': 'SCHEDULED',
+            'createdAt': '2026-09-06T10:00:00',
+          }),
+          201,
+        );
+      }),
+    );
+
+    final appointment = await api.createAdminAppointment(
+      customerId: 'customer-1',
+      serviceIds: ['service-1', 'service-2'],
+      appointmentDateTime: DateTime(2026, 9, 9, 9, 30),
+    );
+
+    expect(request.method, 'POST');
+    expect(request.url.path, '/api/v1/barbers/$barberId/appointments');
+    expect(jsonDecode(request.body), {
+      'customerId': 'customer-1',
+      'serviceIds': ['service-1', 'service-2'],
+      'appointmentDateTime': '2026-09-09T09:30:00',
+    });
+    expect(appointment.customerId, 'customer-1');
+    expect(appointment.serviceIds, ['service-1', 'service-2']);
+    expect(appointment.total, 70);
+  });
+
   test('normaliza horários públicos sem alterar a grade', () async {
     late http.Request request;
     final api = BarberApi(
@@ -132,6 +170,87 @@ void main() {
     expect(request.url.path, '/api/v1/barbers/$barberId/daily-agenda');
     expect(request.url.queryParameters['date'], '2026-09-09');
     expect(agenda.barberId, barberId);
+  });
+
+  test('adminServices consulta serviços no contexto administrativo do barber',
+      () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(jsonEncode([_serviceJson]), 200);
+      }),
+    );
+
+    final services = await api.adminServices();
+
+    expect(request.method, 'GET');
+    expect(request.url.path, '/api/v1/barbers/$barberId/services');
+    expect(services.single.id, 'service-1');
+    expect(services.single.name, 'Corte');
+    expect(services.single.price, 40);
+  });
+
+  test('adminServices mantém tratamento padrão de erro HTTP', () async {
+    final api = BarberApi(
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode({'error': 'Barbeiro não encontrado.'}),
+          404,
+        ),
+      ),
+    );
+
+    await expectLater(
+      api.adminServices(),
+      throwsA(isA<BarberApiException>().having(
+        (error) => error.message,
+        'message',
+        'Barbeiro não encontrado.',
+      )),
+    );
+  });
+
+  test('createAdminService envia POST administrativo do barber', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(jsonEncode(_serviceJson), 201);
+      }),
+    );
+
+    final service = await api.createAdminService(
+      name: 'Corte',
+      price: 40,
+    );
+
+    expect(request.method, 'POST');
+    expect(request.url.path, '/api/v1/barbers/$barberId/services');
+    expect(jsonDecode(request.body), {
+      'name': 'Corte',
+      'description': '',
+      'durationMinutes': 30,
+      'price': 40.0,
+      'active': true,
+    });
+    expect(service.name, 'Corte');
+    expect(service.price, 40);
+  });
+
+  test('deleteAdminService chama DELETE administrativo do barber', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('', 204);
+      }),
+    );
+
+    await api.deleteAdminService('service-1');
+
+    expect(request.method, 'DELETE');
+    expect(request.url.path, '/api/v1/barbers/$barberId/services/service-1');
   });
 
   test('adminCustomers sem query chama endpoint correto', () async {
@@ -207,6 +326,61 @@ void main() {
         'Barbeiro não encontrado.',
       )),
     );
+  });
+
+  test('createAdminCustomer envia POST administrativo do barber', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'id': 'customer-1',
+            'name': 'Gabriel Santana',
+            'phone': '(13) 99999-9999',
+            'email': null,
+            'birthDate': null,
+            'notes': null,
+            'active': true,
+          }),
+          201,
+        );
+      }),
+    );
+
+    final customer = await api.createAdminCustomer(
+      name: 'Gabriel Santana',
+      phone: '(13) 99999-9999',
+    );
+
+    expect(request.method, 'POST');
+    expect(request.url.path, '/api/v1/barbers/$barberId/customers');
+    expect(jsonDecode(request.body), {
+      'name': 'Gabriel Santana',
+      'phone': '(13) 99999-9999',
+      'email': null,
+      'birthDate': null,
+      'notes': null,
+      'active': true,
+    });
+    expect(customer.id, 'customer-1');
+    expect(customer.name, 'Gabriel Santana');
+    expect(customer.phone, '(13) 99999-9999');
+  });
+
+  test('deleteAdminCustomer chama DELETE administrativo do barber', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response('', 204);
+      }),
+    );
+
+    await api.deleteAdminCustomer('customer-1');
+
+    expect(request.method, 'DELETE');
+    expect(request.url.path, '/api/v1/barbers/$barberId/customers/customer-1');
   });
 
   test('trata o retorno de dia sem expediente como lista vazia', () async {
@@ -304,4 +478,11 @@ const _interestJson = {
 const _opportunityJson = {
   'availableSlotId': 'slot-1',
   'availableDateTime': '2026-09-09T09:30:00',
+};
+
+const _serviceJson = {
+  'id': 'service-1',
+  'name': 'Corte',
+  'description': 'Corte masculino',
+  'price': 40,
 };

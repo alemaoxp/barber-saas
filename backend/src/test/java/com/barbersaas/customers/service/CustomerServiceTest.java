@@ -228,6 +228,23 @@ class CustomerServiceTest {
                 .findDistinctByBarberIdAndQuery(BARBER_ID, "%gabriel%");
     }
 
+    @Test
+    void deleteShouldDeactivateCustomerWithoutPhysicalDelete() {
+        CustomerEntity customer = customer(
+                CUSTOMER_ID,
+                "Gabriel Santana",
+                "(13) 99999-9999"
+        );
+        customer.setBarbershop(new BarbershopEntity(BARBER_ID, "Jhow Cortes", true));
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+
+        customerService.delete(BARBER_ID, CUSTOMER_ID);
+
+        assertEquals(false, customer.getActive());
+        verify(customerRepository).save(customer);
+        verify(customerRepository, never()).delete(customer);
+    }
+
     private CustomerEntity customer(UUID id, String name, String phone) {
         CustomerEntity customer =
                 new CustomerEntity(name, phone, null, null, null, true);

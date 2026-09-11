@@ -17,6 +17,7 @@ public interface CustomerRepository extends JpaRepository<CustomerEntity, UUID> 
             SELECT DISTINCT c
             FROM CustomerEntity c
             WHERE c.barbershop.id = :barbershopId
+            AND c.active = true
             """)
     List<CustomerEntity> findDistinctByBarberId(
             @Param("barbershopId") UUID barbershopId
@@ -26,6 +27,7 @@ public interface CustomerRepository extends JpaRepository<CustomerEntity, UUID> 
             SELECT DISTINCT c
             FROM CustomerEntity c
             WHERE c.barbershop.id = :barbershopId
+            AND c.active = true
             AND (
                 LOWER(c.name) LIKE LOWER(:queryPattern)
                 OR c.phone LIKE :queryPattern

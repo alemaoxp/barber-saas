@@ -23,7 +23,7 @@ void main() {
                   'customerId': 'customer-1',
                   'serviceIds': [],
                   'totalPrice': 40,
-                  'appointmentDateTime': '2026-09-10T10:30:00',
+                  'appointmentDateTime': '2099-09-10T10:30:00',
                   'status': 'SCHEDULED',
                   'cancelToken': 'cancel-1',
                 }

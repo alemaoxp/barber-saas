@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+
+import '../clients/admin_clients_page.dart';
 import '../../../services/barber_api.dart';
+import '../services/admin_services_page.dart';
 import 'daily_agenda_models.dart';
 import 'widgets/new_appointment_bottom_sheet.dart';
 
@@ -40,11 +43,7 @@ String _monthName(DateTime date) {
 }
 
 class DailyAgendaPage extends StatefulWidget {
-  const DailyAgendaPage({
-    super.key,
-    this.api,
-    this.initialDate,
-  });
+  const DailyAgendaPage({super.key, this.api, this.initialDate});
 
   final BarberApi? api;
   final DateTime? initialDate;
@@ -82,14 +81,26 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      bottomNavigationBar: const _AdminNavigation(),
+      bottomNavigationBar: _AdminNavigation(
+        onClientsTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => AdminClientsPage(api: _api),
+            ),
+          );
+        },
+        onServicesTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => AdminServicesPage(api: _api),
+            ),
+          );
+        },
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            _Header(
-              selectedDate: _selectedDate,
-              onDateSelected: _selectDate,
-            ),
+            _Header(selectedDate: _selectedDate, onDateSelected: _selectDate),
             Expanded(
               child: FutureBuilder<DailyAgendaResponse>(
                 future: _agenda,
@@ -150,16 +161,17 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
       builder: (_) => NewAppointmentBottomSheet(
         slot: slot,
         api: _api,
+        onCreated: () {
+          Navigator.of(context).pop();
+          _selectDate(_selectedDate);
+        },
       ),
     );
   }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.selectedDate,
-    required this.onDateSelected,
-  });
+  const _Header({required this.selectedDate, required this.onDateSelected});
 
   static const int _bookingWindowDays = 30;
 
@@ -254,9 +266,8 @@ class _Header extends StatelessWidget {
                 tooltip: 'Dia anterior',
               ),
               IconButton(
-                onPressed: () => onDateSelected(
-                  selectedDate.add(const Duration(days: 1)),
-                ),
+                onPressed: () =>
+                    onDateSelected(selectedDate.add(const Duration(days: 1))),
                 icon: const Icon(Icons.chevron_right_rounded),
                 color: _DailyAgendaPageState._primary,
                 tooltip: 'Próximo dia',
@@ -365,10 +376,7 @@ class _DayButton extends StatelessWidget {
 }
 
 class _AgendaList extends StatelessWidget {
-  const _AgendaList({
-    required this.slots,
-    required this.onCreateAppointment,
-  });
+  const _AgendaList({required this.slots, required this.onCreateAppointment});
 
   final List<DailyAgendaSlot> slots;
   final ValueChanged<DailyAgendaSlot> onCreateAppointment;
@@ -385,18 +393,22 @@ class _AgendaList extends StatelessWidget {
       children: [
         if (morning.isNotEmpty) ...[
           const _SectionTitle('Manhã'),
-          ...morning.map((slot) => _AgendaSlotTile(
-                slot: slot,
-                onCreateAppointment: onCreateAppointment,
-              )),
+          ...morning.map(
+            (slot) => _AgendaSlotTile(
+              slot: slot,
+              onCreateAppointment: onCreateAppointment,
+            ),
+          ),
           const SizedBox(height: 14),
         ],
         if (afternoon.isNotEmpty) ...[
           const _SectionTitle('Tarde'),
-          ...afternoon.map((slot) => _AgendaSlotTile(
-                slot: slot,
-                onCreateAppointment: onCreateAppointment,
-              )),
+          ...afternoon.map(
+            (slot) => _AgendaSlotTile(
+              slot: slot,
+              onCreateAppointment: onCreateAppointment,
+            ),
+          ),
         ],
       ],
     );
@@ -447,10 +459,7 @@ class _AgendaSlotTile extends StatelessWidget {
 }
 
 class _FreeSlot extends StatelessWidget {
-  const _FreeSlot({
-    required this.slot,
-    required this.onCreateAppointment,
-  });
+  const _FreeSlot({required this.slot, required this.onCreateAppointment});
 
   final DailyAgendaSlot slot;
   final ValueChanged<DailyAgendaSlot> onCreateAppointment;
@@ -459,9 +468,7 @@ class _FreeSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE9EEF3)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE9EEF3))),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -534,19 +541,6 @@ class _OccupiedSlot extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: const Color(0xFFE0E7F0),
-                        child: Text(
-                          _initials(customerName),
-                          style: const TextStyle(
-                            color: _DailyAgendaPageState._primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,7 +577,9 @@ class _OccupiedSlot extends StatelessWidget {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 9, vertical: 4),
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFDDF3E5),
                               borderRadius: BorderRadius.circular(999),
@@ -623,14 +619,6 @@ class _OccupiedSlot extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _initials(String value) {
-    final words = value.trim().split(RegExp(r'\s+'));
-    if (words.isEmpty || words.first.isEmpty) return 'C';
-    final first = words.first[0];
-    final second = words.length > 1 ? words.last[0] : '';
-    return (first + second).toUpperCase();
   }
 
   String _money(num? value) {
@@ -749,11 +737,7 @@ class _TimeText extends StatelessWidget {
 }
 
 class _MessageState extends StatelessWidget {
-  const _MessageState({
-    required this.title,
-    this.subtitle,
-    this.action,
-  });
+  const _MessageState({required this.title, this.subtitle, this.action});
 
   final String title;
   final String? subtitle;
@@ -784,10 +768,7 @@ class _MessageState extends StatelessWidget {
                 style: const TextStyle(color: Color(0xFF657181)),
               ),
             ],
-            if (action != null) ...[
-              const SizedBox(height: 12),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 12), action!],
           ],
         ),
       ),
@@ -796,7 +777,13 @@ class _MessageState extends StatelessWidget {
 }
 
 class _AdminNavigation extends StatelessWidget {
-  const _AdminNavigation();
+  const _AdminNavigation({
+    required this.onClientsTap,
+    required this.onServicesTap,
+  });
+
+  final VoidCallback onClientsTap;
+  final VoidCallback onServicesTap;
 
   @override
   Widget build(BuildContext context) {
@@ -805,7 +792,7 @@ class _AdminNavigation extends StatelessWidget {
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFE7ECF2))),
       ),
-      child: const SafeArea(
+      child: SafeArea(
         top: false,
         minimum: EdgeInsets.only(bottom: 4),
         child: SizedBox(
@@ -813,24 +800,47 @@ class _AdminNavigation extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(
-                icon: Icons.calendar_today_rounded,
-                label: 'Agenda',
-                active: true,
-              ),
+              const _AgendaNavItem(label: 'Agenda'),
               _NavItem(
                 icon: Icons.content_cut_rounded,
                 label: 'Serviços',
+                onTap: onServicesTap,
               ),
               _NavItem(
                 icon: Icons.people_outline_rounded,
                 label: 'Clientes',
+                onTap: onClientsTap,
               ),
-              _NavItem(
-                icon: Icons.more_horiz_rounded,
-                label: 'Mais',
-              ),
+              _NavItem(icon: Icons.more_horiz_rounded, label: 'Mais'),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AgendaNavItem extends StatelessWidget {
+  const _AgendaNavItem({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 68,
+        height: 58,
+        child: Center(
+          child: Text(
+            label,
+            maxLines: 1,
+            style: const TextStyle(
+              color: _DailyAgendaPageState._primary,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),
@@ -842,42 +852,45 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
     required this.label,
-    this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        active ? _DailyAgendaPageState._primary : _DailyAgendaPageState._muted;
-    return SizedBox(
-      width: 68,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 30,
-            height: 26,
-            decoration: BoxDecoration(
-              color: active ? const Color(0xFFE4F6FF) : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
+    const color = _DailyAgendaPageState._muted;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 68,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 30,
+              height: 26,
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 20, color: color),
             ),
-            child: Icon(icon, size: 20, color: color),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

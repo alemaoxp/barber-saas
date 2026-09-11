@@ -102,8 +102,8 @@ public class CustomerService {
 
     public void delete(UUID barberId, UUID id) {
         CustomerEntity entity = customerForBarber(barberId, id);
-        
-        customerRepository.delete(entity);
+        entity.setActive(false);
+        customerRepository.save(entity);
     }
 
     private BarberEntity barber(UUID barberId) {

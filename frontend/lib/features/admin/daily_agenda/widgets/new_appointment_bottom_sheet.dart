@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/booking_service.dart';
 import '../../../../services/barber_api.dart';
 import '../daily_agenda_models.dart';
 import '../models/admin_customer_summary.dart';
 import 'customer_selection_bottom_sheet.dart';
+import 'service_selection_bottom_sheet.dart';
 
 String _weekdayName(DateTime date) {
   const names = [
@@ -42,15 +44,21 @@ String _dateLabel(DateTime date) =>
 String _timeLabel(DateTime date) =>
     '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
+String _formatPrice(double value) {
+  return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+}
+
 class NewAppointmentBottomSheet extends StatefulWidget {
   const NewAppointmentBottomSheet({
     super.key,
     required this.slot,
     required this.api,
+    required this.onCreated,
   });
 
   final DailyAgendaSlot slot;
   final BarberApi api;
+  final VoidCallback onCreated;
 
   static const _primary = Color(0xFF0D2742);
   static const _muted = Color(0xFF6C7886);
@@ -63,6 +71,17 @@ class NewAppointmentBottomSheet extends StatefulWidget {
 
 class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
   AdminCustomerSummary? _selectedCustomer;
+  List<BookingService> _selectedServices = const [];
+  bool _saving = false;
+  String? _error;
+
+  bool get _canContinue =>
+      !_saving && _selectedCustomer != null && _selectedServices.isNotEmpty;
+
+  double get _servicesTotal => _selectedServices.fold<double>(
+        0,
+        (total, service) => total + service.price,
+      );
 
   Future<void> _selectCustomer() async {
     final customer = await showModalBottomSheet<AdminCustomerSummary>(
@@ -77,6 +96,50 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
     );
     if (!mounted || customer == null) return;
     setState(() => _selectedCustomer = customer);
+  }
+
+  Future<void> _selectServices() async {
+    final services = await showModalBottomSheet<List<BookingService>>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => ServiceSelectionBottomSheet(
+        api: widget.api,
+        initialServices: _selectedServices,
+      ),
+    );
+    if (!mounted || services == null) return;
+    setState(() => _selectedServices = services);
+  }
+
+  Future<void> _createAppointment() async {
+    if (!_canContinue) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.api.createAdminAppointment(
+        customerId: _selectedCustomer!.id,
+        serviceIds: _selectedServices.map((service) => service.id).toList(),
+        appointmentDateTime: widget.slot.dateTime,
+      );
+      if (!mounted) return;
+      widget.onCreated();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error is BarberApiException
+            ? error.message
+            : 'Não foi possível criar o agendamento.';
+        _saving = false;
+      });
+    }
   }
 
   @override
@@ -140,27 +203,45 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
               onTap: _selectCustomer,
             ),
             const SizedBox(height: 18),
-            const _SheetSection(
+            _SheetSection(
               title: 'Serviços',
-              actionLabel: 'Selecionar serviços',
-              onTap: null,
+              actionLabel: _selectedServices.isEmpty
+                  ? 'Selecionar serviços'
+                  : _selectedServices
+                      .map((service) => service.name)
+                      .join(' + '),
+              subtitle: _selectedServices.isEmpty
+                  ? null
+                  : _formatPrice(_servicesTotal),
+              onTap: _selectServices,
             ),
             const SizedBox(height: 28),
+            if (_error != null) ...[
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: null,
+                onPressed: _canContinue ? _createAppointment : null,
                 style: ElevatedButton.styleFrom(
-                  disabledBackgroundColor:
-                      NewAppointmentBottomSheet._primary.withValues(alpha: 0.36),
+                  disabledBackgroundColor: NewAppointmentBottomSheet._primary
+                      .withValues(alpha: 0.36),
                   disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Continuar',
+                child: Text(
+                  _saving ? 'Criando...' : 'Continuar',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
