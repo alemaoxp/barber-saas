@@ -6,11 +6,15 @@ import com.barbersaas.barberschedules.entity.BarberScheduleEntity;
 import com.barbersaas.barberschedules.repository.BarberScheduleRepository;
 import com.barbersaas.barbershops.entity.BarbershopEntity;
 import com.barbersaas.barbershops.repository.BarbershopRepository;
+import com.barbersaas.auth.AdminAuthProperties;
+import com.barbersaas.auth.entity.AdminUserEntity;
+import com.barbersaas.auth.repository.AdminUserRepository;
 import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
 import com.barbersaas.weeklyschedule.repository.WeeklyScheduleRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,18 +36,27 @@ class DevelopmentBarbershopSeed implements ApplicationRunner {
     private final BarberScheduleRepository barberSchedules;
     private final WeeklyScheduleRepository weeklySchedules;
     private final JdbcTemplate jdbcTemplate;
+    private final AdminUserRepository adminUsers;
+    private final PasswordEncoder passwordEncoder;
+    private final AdminAuthProperties adminAuthProperties;
 
     DevelopmentBarbershopSeed(
             BarbershopRepository barbershops,
             BarberRepository barbers,
             BarberScheduleRepository barberSchedules,
             WeeklyScheduleRepository weeklySchedules,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            AdminUserRepository adminUsers,
+            PasswordEncoder passwordEncoder,
+            AdminAuthProperties adminAuthProperties) {
         this.barbershops = barbershops;
         this.barbers = barbers;
         this.barberSchedules = barberSchedules;
         this.weeklySchedules = weeklySchedules;
         this.jdbcTemplate = jdbcTemplate;
+        this.adminUsers = adminUsers;
+        this.passwordEncoder = passwordEncoder;
+        this.adminAuthProperties = adminAuthProperties;
     }
 
     @Override
@@ -64,6 +77,24 @@ class DevelopmentBarbershopSeed implements ApplicationRunner {
                 ));
 
         createMissingWeeklySchedules(schedule);
+        createDevelopmentAdminUser(shop);
+    }
+
+    private void createDevelopmentAdminUser(BarbershopEntity shop) {
+        String email = adminAuthProperties.getDevEmail();
+        String password = adminAuthProperties.getDevPassword();
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            return;
+        }
+        adminUsers.findByEmailIgnoreCase(email).orElseGet(() ->
+                adminUsers.save(new AdminUserEntity(
+                        shop,
+                        adminAuthProperties.getDevName(),
+                        email.trim(),
+                        passwordEncoder.encode(password),
+                        true
+                ))
+        );
     }
 
     private BarberEntity findOrCreateDevelopmentBarber(BarbershopEntity shop) {

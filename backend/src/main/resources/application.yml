@@ -33,6 +33,13 @@ push:
     vapid-private-key: ${PUSH_TEST_VAPID_PRIVATE_KEY:}
     vapid-subject: ${PUSH_TEST_VAPID_SUBJECT:mailto:dev@localhost}
 
+admin:
+  auth:
+    session-duration-days: ${ADMIN_SESSION_DURATION_DAYS:30}
+    dev-email: ${ADMIN_DEV_EMAIL:}
+    dev-password: ${ADMIN_DEV_PASSWORD:}
+    dev-name: ${ADMIN_DEV_NAME:Jhow}
+
 logging:
   level:
     org.hibernate.SQL: DEBUG

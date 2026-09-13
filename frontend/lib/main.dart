@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'features/appointments/appointments_page.dart';
-import 'features/admin/home/admin_home_page.dart';
+import 'features/admin/auth/admin_gate.dart';
 import 'features/home/home_page.dart';
 import 'features/splash/splash_page.dart';
 
@@ -23,7 +23,7 @@ class BarberSaasApp extends StatelessWidget {
       home: switch (Uri.base.queryParameters['screen'] ??
           const String.fromEnvironment('START_SCREEN')) {
         'appointments' => const AppointmentsPage(),
-        'admin' => const AdminHomePage(),
+        'admin' => AdminGate(),
         _ => SplashPage(
             onFinished: () {
               navigatorKey.currentState?.pushReplacement(

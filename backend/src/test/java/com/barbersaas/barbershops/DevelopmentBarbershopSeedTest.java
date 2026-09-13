@@ -6,11 +6,15 @@ import com.barbersaas.barberschedules.entity.BarberScheduleEntity;
 import com.barbersaas.barberschedules.repository.BarberScheduleRepository;
 import com.barbersaas.barbershops.entity.BarbershopEntity;
 import com.barbersaas.barbershops.repository.BarbershopRepository;
+import com.barbersaas.auth.AdminAuthProperties;
+import com.barbersaas.auth.entity.AdminUserEntity;
+import com.barbersaas.auth.repository.AdminUserRepository;
 import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
 import com.barbersaas.weeklyschedule.repository.WeeklyScheduleRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
@@ -28,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -84,7 +89,10 @@ class DevelopmentBarbershopSeedTest {
                 barbers,
                 barberSchedules,
                 weeklySchedules,
-                jdbcTemplate
+                jdbcTemplate,
+                mock(AdminUserRepository.class),
+                mock(PasswordEncoder.class),
+                new AdminAuthProperties()
         ).run(null);
 
         verify(jdbcTemplate).update(
@@ -146,7 +154,10 @@ class DevelopmentBarbershopSeedTest {
                 barbers,
                 barberSchedules,
                 weeklySchedules,
-                jdbcTemplate
+                jdbcTemplate,
+                mock(AdminUserRepository.class),
+                mock(PasswordEncoder.class),
+                new AdminAuthProperties()
         ).run(null);
 
         @SuppressWarnings("unchecked")
@@ -249,11 +260,84 @@ class DevelopmentBarbershopSeedTest {
                 barbers,
                 barberSchedules,
                 weeklySchedules,
-                jdbcTemplate
+                jdbcTemplate,
+                mock(AdminUserRepository.class),
+                mock(PasswordEncoder.class),
+                new AdminAuthProperties()
         ).run(null);
 
         verifyNoInteractions(jdbcTemplate);
         verify(weeklySchedules, never()).saveAll(anyList());
+    }
+
+    @Test
+    void runShouldCreateDevelopmentAdminUserWhenConfigured() {
+        BarbershopRepository barbershops = mock(BarbershopRepository.class);
+        BarberRepository barbers = mock(BarberRepository.class);
+        BarberScheduleRepository barberSchedules =
+                mock(BarberScheduleRepository.class);
+        WeeklyScheduleRepository weeklySchedules =
+                mock(WeeklyScheduleRepository.class);
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        AdminUserRepository adminUsers = mock(AdminUserRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        AdminAuthProperties properties = new AdminAuthProperties();
+        properties.setDevEmail("admin@local.test");
+        properties.setDevPassword("secret");
+        properties.setDevName("Jhow Admin");
+        BarbershopEntity shop =
+                new BarbershopEntity(
+                        DevelopmentBarbershopSeed.JHOW_CORTES_ID,
+                        "Jhow Cortes",
+                        true
+                );
+        BarberEntity barber = new BarberEntity();
+        BarberScheduleEntity schedule =
+                new BarberScheduleEntity(
+                        barber,
+                        30,
+                        5
+                );
+        ReflectionTestUtils.setField(schedule, "id", UUID.randomUUID());
+
+        when(barbershops.findById(DevelopmentBarbershopSeed.JHOW_CORTES_ID))
+                .thenReturn(Optional.of(shop));
+        when(barbers.findById(DevelopmentBarbershopSeed.DEVELOPMENT_BARBER_ID))
+                .thenReturn(Optional.of(barber));
+        when(barberSchedules.findByBarberId(DevelopmentBarbershopSeed.DEVELOPMENT_BARBER_ID))
+                .thenReturn(Optional.of(schedule));
+        when(weeklySchedules.findByBarberScheduleIdOrderByDayOfWeek(schedule.getId()))
+                .thenReturn(List.of(
+                        weeklySchedule(schedule, DayOfWeek.MONDAY),
+                        weeklySchedule(schedule, DayOfWeek.TUESDAY),
+                        weeklySchedule(schedule, DayOfWeek.WEDNESDAY),
+                        weeklySchedule(schedule, DayOfWeek.THURSDAY),
+                        weeklySchedule(schedule, DayOfWeek.FRIDAY),
+                        weeklySchedule(schedule, DayOfWeek.SATURDAY),
+                        weeklySchedule(schedule, DayOfWeek.SUNDAY)
+                ));
+        when(adminUsers.findByEmailIgnoreCase("admin@local.test")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("secret")).thenReturn("bcrypt-hash");
+
+        new DevelopmentBarbershopSeed(
+                barbershops,
+                barbers,
+                barberSchedules,
+                weeklySchedules,
+                jdbcTemplate,
+                adminUsers,
+                passwordEncoder,
+                properties
+        ).run(null);
+
+        verify(adminUsers).save(argThat((AdminUserEntity admin) ->
+                admin.getBarbershop().getId().equals(DevelopmentBarbershopSeed.JHOW_CORTES_ID)
+                        && admin.getEmail().equals("admin@local.test")
+                        && admin.getName().equals("Jhow Admin")
+                        && admin.getPasswordHash().equals("bcrypt-hash")
+                        && !admin.getPasswordHash().equals("secret")
+                        && Boolean.TRUE.equals(admin.getActive())
+        ));
     }
 
     private static WeeklyScheduleEntity weeklySchedule(

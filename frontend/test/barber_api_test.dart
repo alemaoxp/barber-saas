@@ -208,6 +208,91 @@ void main() {
     expect(agenda.barberId, barberId);
   });
 
+  test('BarberApi adiciona Bearer em admin e não em endpoint público',
+      () async {
+    final headers = <String, String?>{};
+    final api = BarberApi(
+      tokenProvider: () async => 'opaque-token',
+      client: MockClient((request) async {
+        headers[request.url.path] = request.headers['Authorization'];
+        if (request.url.path.contains('/daily-agenda')) {
+          return http.Response(
+            jsonEncode({
+              'barberId': barberId,
+              'date': '2026-09-09',
+              'workingDay': true,
+              'slots': [],
+            }),
+            200,
+          );
+        }
+        return http.Response('["09:00:00"]', 200);
+      }),
+    );
+
+    await api.dailyAgenda(DateTime(2026, 9, 9));
+    await api.availableSlots(DateTime(2026, 9, 9));
+
+    expect(
+      headers['/api/v1/barbers/$barberId/daily-agenda'],
+      'Bearer opaque-token',
+    );
+    expect(headers['/api/public/barbers/$barberId/available-slots'], isNull);
+  });
+
+  test('401 administrativo chama callback centralizado', () async {
+    var expired = false;
+    final api = BarberApi(
+      tokenProvider: () async => 'expired',
+      onUnauthorized: () async => expired = true,
+      client: MockClient(
+        (_) async => http.Response(jsonEncode({'error': 'Unauthorized'}), 401),
+      ),
+    );
+
+    await expectLater(
+      api.dailyAgenda(DateTime(2026, 9, 9)),
+      throwsA(isA<BarberApiException>()),
+    );
+
+    expect(expired, isTrue);
+  });
+
+  test('login, me e logout usam endpoints de auth', () async {
+    final calls = <String>[];
+    final api = BarberApi(
+      tokenProvider: () async => 'opaque-token',
+      client: MockClient((request) async {
+        calls.add(
+            '${request.method} ${request.url.path} ${request.headers['Authorization']}');
+        if (request.url.path.endsWith('/login')) {
+          expect(jsonDecode(request.body), {
+            'email': 'admin@example.com',
+            'password': 'secret',
+          });
+          return http.Response(jsonEncode(_loginJson), 200);
+        }
+        if (request.url.path.endsWith('/me')) {
+          return http.Response(jsonEncode(_adminUserJson), 200);
+        }
+        return http.Response('', 200);
+      }),
+    );
+
+    final login = await api.loginAdmin(
+      email: 'admin@example.com',
+      password: 'secret',
+    );
+    final me = await api.currentAdmin();
+    await api.logoutAdmin();
+
+    expect(login.token, 'raw-token');
+    expect(me.email, 'admin@example.com');
+    expect(calls[0], 'POST /api/auth/login null');
+    expect(calls[1], 'GET /api/auth/me Bearer opaque-token');
+    expect(calls[2], 'POST /api/auth/logout Bearer opaque-token');
+  });
+
   test('consulta weekly-schedule administrativo do barber', () async {
     late http.Request request;
     final api = BarberApi(
@@ -729,4 +814,17 @@ const _serviceJson = {
   'name': 'Corte',
   'description': 'Corte masculino',
   'price': 40,
+};
+
+const _adminUserJson = {
+  'id': 'admin-1',
+  'name': 'Jhow',
+  'email': 'admin@example.com',
+  'barbershopId': 'shop-1',
+  'barbershopName': 'Jhow Cortes',
+};
+
+const _loginJson = {
+  'token': 'raw-token',
+  'user': _adminUserJson,
 };

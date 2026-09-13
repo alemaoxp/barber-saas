@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../services/barber_api.dart';
 import '../admin_navigation.dart';
+import '../auth/admin_auth.dart';
+import '../auth/admin_login_page.dart';
 import '../services/admin_services_page.dart';
 import 'admin_schedule_blocks_page.dart';
 import 'admin_settings_page.dart';
@@ -89,10 +91,25 @@ class AdminMorePage extends StatelessWidget {
               },
             ),
             const SizedBox(height: 8),
-            const _MoreTile(
+            _MoreTile(
               icon: Icons.logout_rounded,
               title: 'Sair',
-              subtitle: 'Disponível quando houver autenticação',
+              onTap: () async {
+                final store = AdminAuthStore();
+                try {
+                  await resolvedApi.logoutAdmin();
+                } catch (_) {
+                  // Sessao expirada: limpar localmente mesmo assim.
+                }
+                await store.clear();
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AdminLoginPage(store: store),
+                  ),
+                  (_) => false,
+                );
+              },
             ),
           ],
         ),

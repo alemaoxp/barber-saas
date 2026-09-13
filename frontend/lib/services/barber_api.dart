@@ -7,6 +7,7 @@ import '../models/availability_interest.dart';
 import '../models/booking_service.dart';
 import '../features/admin/daily_agenda/daily_agenda_models.dart';
 import '../features/admin/daily_agenda/models/admin_customer_summary.dart';
+import '../features/admin/auth/admin_auth.dart';
 import '../features/admin/more/weekly_schedule_models.dart';
 import '../features/admin/more/schedule_block_models.dart';
 import 'push_test_client.dart';
@@ -16,19 +17,26 @@ const barberId = '3700633c-35f1-4ab9-af18-c60f8eb23b45';
 
 class BarberApiException implements Exception {
   final String message;
-  const BarberApiException(this.message);
+  final int? statusCode;
+  const BarberApiException(this.message, {this.statusCode});
 }
 
 class BarberApi {
   BarberApi({
     http.Client? client,
+    Future<String?> Function()? tokenProvider,
+    Future<void> Function()? onUnauthorized,
     Future<Map<String, dynamic>> Function(String publicKey)?
         createPushSubscription,
   })  : _client = client ?? http.Client(),
+        _tokenProvider = tokenProvider,
+        _onUnauthorized = onUnauthorized,
         _createPushSubscription =
             createPushSubscription ?? createPushTestSubscription;
 
   final http.Client _client;
+  final Future<String?> Function()? _tokenProvider;
+  final Future<void> Function()? _onUnauthorized;
   final Future<Map<String, dynamic>> Function(String publicKey)
       _createPushSubscription;
 
@@ -39,8 +47,8 @@ class BarberApi {
   }
 
   Future<List<BookingService>> adminServices() async {
-    final response = await _client
-        .get(Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services'));
+    final response = await _adminGet(
+        Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services'));
     return _list(response, BookingService.fromJson);
   }
 
@@ -48,9 +56,8 @@ class BarberApi {
     required String name,
     required double price,
   }) async {
-    final response = await _client.post(
+    final response = await _adminPost(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
         'description': '',
@@ -70,9 +77,8 @@ class BarberApi {
     required String name,
     required double price,
   }) async {
-    final response = await _client.put(
+    final response = await _adminPut(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services/$serviceId'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
         'price': price,
@@ -99,7 +105,7 @@ class BarberApi {
 
   Future<DailyAgendaResponse> dailyAgenda(DateTime date) async {
     final day = _dateOnly(date);
-    final response = await _client.get(Uri.parse(
+    final response = await _adminGet(Uri.parse(
         '$apiBaseUrl/api/v1/barbers/$barberId/daily-agenda?date=$day'));
     _ensureSuccess(response);
     return DailyAgendaResponse.fromJson(
@@ -107,7 +113,7 @@ class BarberApi {
   }
 
   Future<WeeklyScheduleResponse> weeklySchedule() async {
-    final response = await _client.get(
+    final response = await _adminGet(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/weekly-schedule'),
     );
     _ensureSuccess(response);
@@ -119,9 +125,8 @@ class BarberApi {
   Future<WeeklyScheduleResponse> updateWeeklySchedule(
     List<WeeklyScheduleDay> weeklySchedule,
   ) async {
-    final response = await _client.put(
+    final response = await _adminPut(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/weekly-schedule'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'weeklySchedule': weeklySchedule.map((day) => day.toJson()).toList(),
       }),
@@ -133,7 +138,7 @@ class BarberApi {
   }
 
   Future<List<ScheduleBlock>> scheduleBlocks() async {
-    final response = await _client.get(
+    final response = await _adminGet(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/schedule-blocks'),
     );
     return _list(response, ScheduleBlock.fromJson);
@@ -144,9 +149,8 @@ class BarberApi {
     required DateTime endDateTime,
     String? reason,
   }) async {
-    final response = await _client.post(
+    final response = await _adminPost(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/schedule-blocks'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'startDateTime': _isoLocal(startDateTime),
         'endDateTime': _isoLocal(endDateTime),
@@ -160,7 +164,7 @@ class BarberApi {
   }
 
   Future<void> deleteScheduleBlock(String scheduleBlockId) async {
-    final response = await _client.delete(
+    final response = await _adminDelete(
       Uri.parse(
         '$apiBaseUrl/api/v1/barbers/$barberId/schedule-blocks/$scheduleBlockId',
       ),
@@ -174,7 +178,7 @@ class BarberApi {
         .replace(
             queryParameters:
                 trimmed == null || trimmed.isEmpty ? null : {'query': trimmed});
-    final response = await _client.get(uri);
+    final response = await _adminGet(uri);
     return _list(response, AdminCustomerSummary.fromJson);
   }
 
@@ -182,9 +186,8 @@ class BarberApi {
     required String name,
     required String phone,
   }) async {
-    final response = await _client.post(
+    final response = await _adminPost(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
         'phone': phone,
@@ -205,9 +208,8 @@ class BarberApi {
     required String name,
     required String phone,
   }) async {
-    final response = await _client.put(
+    final response = await _adminPut(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers/$customerId'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
         'phone': phone,
@@ -220,7 +222,7 @@ class BarberApi {
   }
 
   Future<void> deleteAdminCustomer(String customerId) async {
-    final response = await _client.delete(
+    final response = await _adminDelete(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers/$customerId'),
     );
     _ensureSuccess(response, expectedStatus: 204);
@@ -252,9 +254,8 @@ class BarberApi {
     required List<String> serviceIds,
     required DateTime appointmentDateTime,
   }) async {
-    final response = await _client.post(
+    final response = await _adminPost(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/appointments'),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'customerId': customerId,
         'serviceIds': serviceIds,
@@ -271,11 +272,10 @@ class BarberApi {
     String appointmentId,
     String status,
   ) async {
-    final response = await _client.patch(
+    final response = await _adminPatch(
       Uri.parse(
         '$apiBaseUrl/api/v1/barbers/$barberId/appointments/$appointmentId/status',
       ),
-      headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'status': status}),
     );
     _ensureSuccess(response);
@@ -285,7 +285,7 @@ class BarberApi {
   }
 
   Future<void> deleteAdminService(String serviceId) async {
-    final response = await _client.delete(
+    final response = await _adminDelete(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services/$serviceId'),
     );
     _ensureSuccess(response, expectedStatus: 204);
@@ -374,6 +374,37 @@ class BarberApi {
         jsonDecode(response.body) as Map<String, dynamic>);
   }
 
+  Future<AdminLoginResult> loginAdmin({
+    required String email,
+    required String password,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    _ensureSuccess(response);
+    return AdminLoginResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<AdminUser> currentAdmin() async {
+    final response = await _adminGet(Uri.parse('$apiBaseUrl/api/auth/me'));
+    _ensureSuccess(response);
+    return AdminUser.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> logoutAdmin() async {
+    final response = await _adminPost(Uri.parse('$apiBaseUrl/api/auth/logout'));
+    if (response.statusCode == 401) {
+      await _onUnauthorized?.call();
+      return;
+    }
+    _ensureSuccess(response);
+  }
+
   List<T> _list<T>(
       http.Response response, T Function(Map<String, dynamic>) fromJson) {
     _ensureSuccess(response);
@@ -385,11 +416,42 @@ class BarberApi {
   void _ensureSuccess(http.Response response, {int? expectedStatus}) {
     if (response.statusCode == (expectedStatus ?? 200)) return;
     final body = jsonDecode(response.body.isEmpty ? '{}' : response.body);
-    throw BarberApiException(body is Map && body['message'] is String
-        ? body['message'] as String
-        : body is Map && body['error'] is String
-            ? body['error'] as String
-            : 'Não foi possível concluir a operação.');
+    throw BarberApiException(
+        body is Map && body['message'] is String
+            ? body['message'] as String
+            : body is Map && body['error'] is String
+                ? body['error'] as String
+                : 'Não foi possível concluir a operação.',
+        statusCode: response.statusCode);
+  }
+
+  Future<http.Response> _adminGet(Uri uri) async =>
+      _adminSend((headers) => _client.get(uri, headers: headers));
+
+  Future<http.Response> _adminPost(Uri uri, {Object? body}) async =>
+      _adminSend((headers) => _client.post(uri, headers: headers, body: body));
+
+  Future<http.Response> _adminPut(Uri uri, {Object? body}) async =>
+      _adminSend((headers) => _client.put(uri, headers: headers, body: body));
+
+  Future<http.Response> _adminPatch(Uri uri, {Object? body}) async =>
+      _adminSend((headers) => _client.patch(uri, headers: headers, body: body));
+
+  Future<http.Response> _adminDelete(Uri uri) async =>
+      _adminSend((headers) => _client.delete(uri, headers: headers));
+
+  Future<http.Response> _adminSend(
+      Future<http.Response> Function(Map<String, String> headers) send) async {
+    final headers = {'Content-Type': 'application/json'};
+    final token = await _tokenProvider?.call();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    final response = await send(headers);
+    if (response.statusCode == 401) {
+      await _onUnauthorized?.call();
+    }
+    return response;
   }
 
   bool _isNoWorkingDay(String body) {
