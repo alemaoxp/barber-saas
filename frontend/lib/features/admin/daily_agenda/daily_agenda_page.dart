@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../clients/admin_clients_page.dart';
 import '../../../services/barber_api.dart';
-import '../services/admin_services_page.dart';
+import '../admin_navigation.dart';
 import 'daily_agenda_models.dart';
 import 'widgets/new_appointment_bottom_sheet.dart';
 
@@ -81,22 +80,8 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      bottomNavigationBar: _AdminNavigation(
-        onClientsTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => AdminClientsPage(api: _api),
-            ),
-          );
-        },
-        onServicesTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => AdminServicesPage(api: _api),
-            ),
-          );
-        },
-      ),
+      bottomNavigationBar:
+          AdminNavigation(activeTab: AdminTab.agenda, api: _api),
       body: SafeArea(
         child: Column(
           children: [
@@ -136,6 +121,7 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
                   return _AgendaList(
                     slots: agenda.slots,
                     onCreateAppointment: _openNewAppointment,
+                    onOpenAppointment: _openAppointmentDetails,
                   );
                 },
               ),
@@ -167,6 +153,15 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
         },
       ),
     );
+  }
+
+  Future<void> _openAppointmentDetails(DailyAgendaSlot slot) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => AppointmentDetailsPage(slot: slot, api: _api),
+      ),
+    );
+    if (updated == true && mounted) _selectDate(_selectedDate);
   }
 }
 
@@ -376,10 +371,15 @@ class _DayButton extends StatelessWidget {
 }
 
 class _AgendaList extends StatelessWidget {
-  const _AgendaList({required this.slots, required this.onCreateAppointment});
+  const _AgendaList({
+    required this.slots,
+    required this.onCreateAppointment,
+    required this.onOpenAppointment,
+  });
 
   final List<DailyAgendaSlot> slots;
   final ValueChanged<DailyAgendaSlot> onCreateAppointment;
+  final ValueChanged<DailyAgendaSlot> onOpenAppointment;
 
   @override
   Widget build(BuildContext context) {
@@ -397,6 +397,7 @@ class _AgendaList extends StatelessWidget {
             (slot) => _AgendaSlotTile(
               slot: slot,
               onCreateAppointment: onCreateAppointment,
+              onOpenAppointment: onOpenAppointment,
             ),
           ),
           const SizedBox(height: 14),
@@ -407,6 +408,7 @@ class _AgendaList extends StatelessWidget {
             (slot) => _AgendaSlotTile(
               slot: slot,
               onCreateAppointment: onCreateAppointment,
+              onOpenAppointment: onOpenAppointment,
             ),
           ),
         ],
@@ -440,10 +442,12 @@ class _AgendaSlotTile extends StatelessWidget {
   const _AgendaSlotTile({
     required this.slot,
     required this.onCreateAppointment,
+    required this.onOpenAppointment,
   });
 
   final DailyAgendaSlot slot;
   final ValueChanged<DailyAgendaSlot> onCreateAppointment;
+  final ValueChanged<DailyAgendaSlot> onOpenAppointment;
 
   @override
   Widget build(BuildContext context) {
@@ -452,7 +456,10 @@ class _AgendaSlotTile extends StatelessWidget {
           slot: slot,
           onCreateAppointment: onCreateAppointment,
         ),
-      DailyAgendaSlotStatus.occupied => _OccupiedSlot(slot: slot),
+      DailyAgendaSlotStatus.occupied => _OccupiedSlot(
+          slot: slot,
+          onOpenAppointment: onOpenAppointment,
+        ),
       DailyAgendaSlotStatus.blocked => _BlockedSlot(slot: slot),
     };
   }
@@ -509,9 +516,10 @@ class _FreeSlot extends StatelessWidget {
 }
 
 class _OccupiedSlot extends StatelessWidget {
-  const _OccupiedSlot({required this.slot});
+  const _OccupiedSlot({required this.slot, required this.onOpenAppointment});
 
   final DailyAgendaSlot slot;
+  final ValueChanged<DailyAgendaSlot> onOpenAppointment;
 
   @override
   Widget build(BuildContext context) {
@@ -532,7 +540,7 @@ class _OccupiedSlot extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-                onTap: () {},
+                onTap: () => onOpenAppointment(slot),
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
                   decoration: BoxDecoration(
@@ -571,39 +579,6 @@ class _OccupiedSlot extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDDF3E5),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              _statusLabel(slot.appointmentStatus),
-                              style: const TextStyle(
-                                color: Color(0xFF16773A),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            _money(slot.totalPrice),
-                            style: const TextStyle(
-                              color: _DailyAgendaPageState._primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
                       const SizedBox(width: 7),
                       const Icon(
                         Icons.chevron_right_rounded,
@@ -620,19 +595,94 @@ class _OccupiedSlot extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _money(num? value) {
-    if (value == null) return 'R\$ 0,00';
-    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+class AppointmentDetailsPage extends StatefulWidget {
+  const AppointmentDetailsPage(
+      {super.key, required this.slot, required this.api});
+
+  final DailyAgendaSlot slot;
+  final BarberApi api;
+
+  @override
+  State<AppointmentDetailsPage> createState() => _AppointmentDetailsPageState();
+}
+
+class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
+  bool _saving = false;
+
+  Future<void> _updateStatus(String status) async {
+    final appointmentId = widget.slot.appointmentId;
+    if (appointmentId == null) return;
+    setState(() => _saving = true);
+    try {
+      await widget.api.updateAppointmentStatus(appointmentId, status);
+      if (mounted) Navigator.of(context).pop(true);
+    } on BarberApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
-  String _statusLabel(String? status) {
-    return switch (status) {
-      'SCHEDULED' => 'Agendado',
-      'COMPLETED' => 'Concluído',
-      _ => status ?? 'Agendado',
-    };
+  Future<void> _confirmNoShow() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar falta?'),
+        content: const Text(
+            'Este atendimento será retirado do valor previsto hoje.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Não compareceu'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _updateStatus('NO_SHOW');
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final slot = widget.slot;
+    final canMarkNoShow = slot.appointmentStatus == 'SCHEDULED' &&
+        !DateTime.now().isBefore(slot.dateTime);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Detalhes do agendamento')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Text(
+            slot.customer?.name ?? 'Cliente',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(_time(slot.dateTime)),
+          const SizedBox(height: 8),
+          Text(slot.services.map((service) => service.name).join(' + ')),
+          if (canMarkNoShow) ...[
+            const SizedBox(height: 24),
+            OutlinedButton(
+              onPressed: _saving ? null : _confirmNoShow,
+              child: const Text('Marcar como não compareceu'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _time(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
 
 class _BlockedSlot extends StatelessWidget {
@@ -769,126 +819,6 @@ class _MessageState extends StatelessWidget {
               ),
             ],
             if (action != null) ...[const SizedBox(height: 12), action!],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AdminNavigation extends StatelessWidget {
-  const _AdminNavigation({
-    required this.onClientsTap,
-    required this.onServicesTap,
-  });
-
-  final VoidCallback onClientsTap;
-  final VoidCallback onServicesTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE7ECF2))),
-      ),
-      child: SafeArea(
-        top: false,
-        minimum: EdgeInsets.only(bottom: 4),
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              const _AgendaNavItem(label: 'Agenda'),
-              _NavItem(
-                icon: Icons.content_cut_rounded,
-                label: 'Serviços',
-                onTap: onServicesTap,
-              ),
-              _NavItem(
-                icon: Icons.people_outline_rounded,
-                label: 'Clientes',
-                onTap: onClientsTap,
-              ),
-              _NavItem(icon: Icons.more_horiz_rounded, label: 'Mais'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AgendaNavItem extends StatelessWidget {
-  const _AgendaNavItem({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 68,
-        height: 58,
-        child: Center(
-          child: Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              color: _DailyAgendaPageState._primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const color = _DailyAgendaPageState._muted;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 68,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 30,
-              height: 26,
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
           ],
         ),
       ),

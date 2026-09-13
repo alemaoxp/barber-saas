@@ -22,7 +22,6 @@ public class UpdateCustomerRequest {
     @Size(max = 500, message = "Observações não pode exceder 500 caracteres")
     private String notes;
 
-    @NotNull(message = "Status ativo é obrigatório")
     private Boolean active;
 
     // Getters and Setters

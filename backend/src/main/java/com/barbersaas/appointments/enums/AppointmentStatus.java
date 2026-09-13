@@ -3,5 +3,6 @@ package com.barbersaas.appointments.enums;
 public enum AppointmentStatus {
     SCHEDULED,
     COMPLETED,
-    CANCELED
+    CANCELED,
+    NO_SHOW
 }

@@ -14,10 +14,16 @@ void main() {
   testWidgets('renderiza FREE, OCCUPIED, BLOCKED e navegação admin', (
     tester,
   ) async {
+    String? statusRequestPath;
     final api = BarberApi(
-      client: MockClient(
-        (_) async => http.Response(jsonEncode(_agendaJson), 200),
-      ),
+      client: MockClient((request) async {
+        if (request.method == 'PATCH') {
+          statusRequestPath = request.url.path;
+          expect(jsonDecode(request.body), {'status': 'NO_SHOW'});
+          return http.Response(jsonEncode(_noShowAppointmentJson), 200);
+        }
+        return http.Response(jsonEncode(_agendaJson), 200);
+      }),
     );
 
     await tester.pumpWidget(
@@ -36,9 +42,9 @@ void main() {
     expect(agendaBottomItem, findsOneWidget);
     expect(
       find.descendant(of: agendaBottomItem, matching: find.byType(Icon)),
-      findsNothing,
+      findsOneWidget,
     );
-    expect(find.byIcon(Icons.calendar_today_rounded), findsNothing);
+    expect(find.byIcon(Icons.calendar_today_rounded), findsOneWidget);
     expect(find.text('Manhã'), findsOneWidget);
     expect(find.text('Tarde'), findsOneWidget);
     expect(find.text('Horário livre'), findsOneWidget);
@@ -57,8 +63,8 @@ void main() {
       findsNothing,
     );
     expect(find.text('Corte + Barba'), findsOneWidget);
-    expect(find.text('R\$ 80,00'), findsOneWidget);
-    expect(find.text('Agendado'), findsOneWidget);
+    expect(find.text('R\$ 80,00'), findsNothing);
+    expect(find.text('Pendente'), findsNothing);
     expect(find.text('09:30'), findsOneWidget);
     expect(find.text('10:00'), findsOneWidget);
     expect(find.text('14:30'), findsOneWidget);
@@ -67,7 +73,8 @@ void main() {
     }
     expect(find.text('Bloqueado'), findsOneWidget);
     expect(find.text('Dentista'), findsOneWidget);
-    expect(find.text('Serviços'), findsOneWidget);
+    expect(find.text('Início'), findsOneWidget);
+    expect(find.text('Serviços'), findsNothing);
     expect(find.text('Clientes'), findsOneWidget);
     expect(find.text('Mais'), findsOneWidget);
     expect(
@@ -83,6 +90,21 @@ void main() {
       findsNothing,
     );
     expect(find.byTooltip('Novo agendamento'), findsOneWidget);
+
+    await tester.tap(find.text('Gabriel Silva'));
+    await tester.pumpAndSettle();
+    expect(find.text('Concluir atendimento'), findsNothing);
+    expect(find.text('Marcar como não compareceu'), findsOneWidget);
+
+    await tester.tap(find.text('Marcar como não compareceu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirmar falta?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Não compareceu'));
+    await tester.pumpAndSettle();
+    expect(
+      statusRequestPath,
+      '/api/v1/barbers/$barberId/appointments/appointment-1/status',
+    );
   });
 
   testWidgets('tocar no mais de FREE abre bottom sheet Novo agendamento', (
@@ -499,8 +521,8 @@ void main() {
     expect(find.text('Horário livre'), findsNothing);
     expect(find.text('Gabriel Santana'), findsOneWidget);
     expect(find.text('Corte + Barba'), findsOneWidget);
-    expect(find.text('R\$ 70,00'), findsOneWidget);
-    expect(find.text('Agendado'), findsOneWidget);
+    expect(find.text('R\$ 70,00'), findsNothing);
+    expect(find.text('Pendente'), findsNothing);
     for (final icon in _clockIcons) {
       expect(find.byIcon(icon), findsNothing);
     }
@@ -841,6 +863,16 @@ const _createdAppointmentJson = {
   'appointmentDateTime': '2026-09-09T09:30:00',
   'status': 'SCHEDULED',
   'createdAt': '2026-09-10T10:00:00',
+};
+
+const _noShowAppointmentJson = {
+  'id': 'appointment-1',
+  'customerId': 'customer-1',
+  'serviceIds': ['service-1', 'service-2'],
+  'totalPrice': 80,
+  'appointmentDateTime': '2026-09-09T10:00:00',
+  'status': 'NO_SHOW',
+  'createdAt': '2026-09-09T08:00:00',
 };
 
 const _clockIcons = [

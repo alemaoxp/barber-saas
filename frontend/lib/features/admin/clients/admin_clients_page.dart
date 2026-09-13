@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../features/admin/daily_agenda/models/admin_customer_summary.dart';
 import '../../../formatters/brazilian_phone_input_formatter.dart';
 import '../../../services/barber_api.dart';
-import '../services/admin_services_page.dart';
+import '../admin_navigation.dart';
 
 class AdminClientsPage extends StatefulWidget {
   const AdminClientsPage({super.key, this.api});
@@ -69,11 +69,26 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     }
   }
 
+  Future<void> _openClientDetails(AdminCustomerSummary client) async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _ClientDetailsBottomSheet(api: _api, client: client),
+    );
+    if (updated == true) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      bottomNavigationBar: _AdminNavigation(api: _api),
+      bottomNavigationBar:
+          AdminNavigation(activeTab: AdminTab.clients, api: _api),
       body: SafeArea(
         child: Column(
           children: [
@@ -115,7 +130,10 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         background: const SizedBox.shrink(),
                         secondaryBackground: const _DeleteSwipeBackground(),
                         onDismissed: (_) => _deleteClient(client),
-                        child: _ClientTile(client: client),
+                        child: _ClientTile(
+                          client: client,
+                          onTap: () => _openClientDetails(client),
+                        ),
                       );
                     },
                   );
@@ -199,43 +217,242 @@ class _Header extends StatelessWidget {
 }
 
 class _ClientTile extends StatelessWidget {
-  const _ClientTile({required this.client});
+  const _ClientTile({required this.client, required this.onTap});
 
   final AdminCustomerSummary client;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _AdminClientsPageState._line),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border.all(color: _AdminClientsPageState._line),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                client.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _AdminClientsPageState._primary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                client.phone,
+                style: const TextStyle(
+                  color: _AdminClientsPageState._muted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            client.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _AdminClientsPageState._primary,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
+    );
+  }
+}
+
+class _ClientDetailsBottomSheet extends StatefulWidget {
+  const _ClientDetailsBottomSheet({required this.api, required this.client});
+
+  final BarberApi api;
+  final AdminCustomerSummary client;
+
+  @override
+  State<_ClientDetailsBottomSheet> createState() =>
+      _ClientDetailsBottomSheetState();
+}
+
+class _ClientDetailsBottomSheetState extends State<_ClientDetailsBottomSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  bool _editing = false;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.client.name);
+    _phoneController = TextEditingController(text: widget.client.phone);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.api.updateAdminCustomer(
+        customerId: widget.client.id,
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error is BarberApiException
+            ? error.message
+            : 'Não foi possível salvar o cliente.';
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          22,
+          0,
+          22,
+          18 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 46,
+                  height: 5,
+                  margin: const EdgeInsets.only(top: 10, bottom: 22),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD8DEE6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              if (_editing) ...[
+                const Text(
+                  'Editar cliente',
+                  style: TextStyle(
+                    color: _AdminClientsPageState._primary,
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                  textInputAction: TextInputAction.next,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Informe o nome.'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(labelText: 'Telefone'),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [BrazilianPhoneInputFormatter()],
+                  validator: (value) {
+                    final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
+                    if (digits.isEmpty) return 'Informe o telefone.';
+                    return digits.length >= 10
+                        ? null
+                        : 'Informe um telefone válido.';
+                  },
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _AdminClientsPageState._primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(_saving ? 'Salvando...' : 'Salvar alterações'),
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  widget.client.name,
+                  style: const TextStyle(
+                    color: _AdminClientsPageState._primary,
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  widget.client.phone,
+                  style: const TextStyle(
+                    color: _AdminClientsPageState._muted,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: () => setState(() => _editing = true),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _AdminClientsPageState._primary,
+                      side: const BorderSide(
+                        color: _AdminClientsPageState._line,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Editar'),
+                  ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            client.phone,
-            style: const TextStyle(
-              color: _AdminClientsPageState._muted,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -440,137 +657,6 @@ class _MessageState extends StatelessWidget {
               ),
             ],
             if (action != null) ...[const SizedBox(height: 12), action!],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AdminNavigation extends StatelessWidget {
-  const _AdminNavigation({required this.api});
-
-  final BarberApi api;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE7ECF2))),
-      ),
-      child: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 4),
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _AgendaNavItem(
-                label: 'Agenda',
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-              _NavItem(
-                icon: Icons.content_cut_rounded,
-                label: 'Serviços',
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AdminServicesPage(api: api),
-                    ),
-                  );
-                },
-              ),
-              const _NavItem(
-                icon: Icons.people_outline_rounded,
-                label: 'Clientes',
-                active: true,
-              ),
-              const _NavItem(icon: Icons.more_horiz_rounded, label: 'Mais'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AgendaNavItem extends StatelessWidget {
-  const _AgendaNavItem({required this.label, this.onTap});
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 68,
-        height: 58,
-        child: Center(
-          child: Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              color: _AdminClientsPageState._muted,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active
-        ? _AdminClientsPageState._primary
-        : _AdminClientsPageState._muted;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 68,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 30,
-              height: 26,
-              decoration: BoxDecoration(
-                color: active ? const Color(0xFFE4F6FF) : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-              ),
-            ),
           ],
         ),
       ),

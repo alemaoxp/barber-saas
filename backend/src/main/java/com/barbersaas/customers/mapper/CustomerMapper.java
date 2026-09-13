@@ -23,10 +23,6 @@ public class CustomerMapper {
     public void updateEntity(CustomerEntity entity, UpdateCustomerRequest request) {
         entity.setName(request.getName());
         entity.setPhone(request.getPhone());
-        entity.setEmail(request.getEmail());
-        entity.setBirthDate(request.getBirthDate());
-        entity.setNotes(request.getNotes());
-        entity.setActive(request.getActive());
     }
 
     public CustomerResponse toResponse(CustomerEntity entity) {

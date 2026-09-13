@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../clients/admin_clients_page.dart';
 import '../../../models/booking_service.dart';
 import '../../../services/barber_api.dart';
 
 class AdminServicesPage extends StatefulWidget {
-  const AdminServicesPage({super.key, this.api});
+  const AdminServicesPage({super.key, this.api, this.showBackToMore = false});
 
   final BarberApi? api;
+  final bool showBackToMore;
 
   @override
   State<AdminServicesPage> createState() => _AdminServicesPageState();
@@ -68,15 +68,28 @@ class _AdminServicesPageState extends State<AdminServicesPage> {
     }
   }
 
+  Future<void> _openServiceDetails(BookingService service) async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _ServiceDetailsBottomSheet(api: _api, service: service),
+    );
+    if (updated == true) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      bottomNavigationBar: _AdminNavigation(api: _api),
       body: SafeArea(
         child: Column(
           children: [
-            const _Header(),
+            _Header(api: _api, showBackToMore: widget.showBackToMore),
             Expanded(
               child: FutureBuilder<List<BookingService>>(
                 future: _services,
@@ -114,7 +127,10 @@ class _AdminServicesPageState extends State<AdminServicesPage> {
                         background: const SizedBox.shrink(),
                         secondaryBackground: const _DeleteSwipeBackground(),
                         onDismissed: (_) => _deleteService(service),
-                        child: _ServiceTile(service: service),
+                        child: _ServiceTile(
+                          service: service,
+                          onTap: () => _openServiceDetails(service),
+                        ),
                       );
                     },
                   );
@@ -136,7 +152,10 @@ class _AdminServicesPageState extends State<AdminServicesPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.api, required this.showBackToMore});
+
+  final BarberApi api;
+  final bool showBackToMore;
 
   @override
   Widget build(BuildContext context) {
@@ -144,36 +163,53 @@ class _Header extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 14, 22, 20),
       color: Colors.white,
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Column(
+          SizedBox(
+            height: 42,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text(
-                  'Jhow Cortes',
-                  style: TextStyle(
-                    color: _AdminServicesPageState._primary,
-                    fontSize: 17,
-                    height: 1,
-                    fontWeight: FontWeight.w800,
+                if (showBackToMore)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      tooltip: 'Voltar para Mais',
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      color: _AdminServicesPageState._primary,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'BARBEARIA',
-                  style: TextStyle(
-                    color: _AdminServicesPageState._muted,
-                    fontSize: 7,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 3,
-                  ),
+                const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Jhow Cortes',
+                      style: TextStyle(
+                        color: _AdminServicesPageState._primary,
+                        fontSize: 17,
+                        height: 1,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'BARBEARIA',
+                      style: TextStyle(
+                        color: _AdminServicesPageState._muted,
+                        fontSize: 7,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 24),
+          const Text(
             'Serviços',
             style: TextStyle(
               color: _AdminServicesPageState._primary,
@@ -182,8 +218,8 @@ class _Header extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
+          const SizedBox(height: 8),
+          const Text(
             'Gerencie os serviços da barbearia',
             style: TextStyle(
               color: Color(0xFF465260),
@@ -198,42 +234,247 @@ class _Header extends StatelessWidget {
 }
 
 class _ServiceTile extends StatelessWidget {
-  const _ServiceTile({required this.service});
+  const _ServiceTile({required this.service, required this.onTap});
 
   final BookingService service;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _AdminServicesPageState._line),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              service.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: _AdminServicesPageState._primary,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border.all(color: _AdminServicesPageState._line),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  service.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _AdminServicesPageState._primary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
-            ),
+              Text(
+                _formatPrice(service.price),
+                style: const TextStyle(
+                  color: _AdminServicesPageState._primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-          Text(
-            _formatPrice(service.price),
-            style: const TextStyle(
-              color: _AdminServicesPageState._primary,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceDetailsBottomSheet extends StatefulWidget {
+  const _ServiceDetailsBottomSheet({required this.api, required this.service});
+
+  final BarberApi api;
+  final BookingService service;
+
+  @override
+  State<_ServiceDetailsBottomSheet> createState() =>
+      _ServiceDetailsBottomSheetState();
+}
+
+class _ServiceDetailsBottomSheetState
+    extends State<_ServiceDetailsBottomSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _priceController;
+  bool _editing = false;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.service.name);
+    _priceController = TextEditingController(
+      text: _formatPrice(widget.service.price),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.api.updateAdminService(
+        serviceId: widget.service.id,
+        name: _nameController.text.trim(),
+        price: _parsePrice(_priceController.text),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error is BarberApiException
+            ? error.message
+            : 'Não foi possível salvar o serviço.';
+        _saving = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          22,
+          0,
+          22,
+          18 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 46,
+                  height: 5,
+                  margin: const EdgeInsets.only(top: 10, bottom: 22),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD8DEE6),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              if (_editing) ...[
+                const Text(
+                  'Editar serviço',
+                  style: TextStyle(
+                    color: _AdminServicesPageState._primary,
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _nameController,
+                  decoration:
+                      const InputDecoration(labelText: 'Nome do serviço'),
+                  textInputAction: TextInputAction.next,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Informe o nome do serviço.'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(labelText: 'Preço'),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Informe o preço.';
+                    }
+                    return _parsePrice(value) > 0
+                        ? null
+                        : 'Informe um preço maior que zero.';
+                  },
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _AdminServicesPageState._primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(_saving ? 'Salvando...' : 'Salvar alterações'),
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  widget.service.name,
+                  style: const TextStyle(
+                    color: _AdminServicesPageState._primary,
+                    fontSize: 24,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _formatPrice(widget.service.price),
+                  style: const TextStyle(
+                    color: _AdminServicesPageState._primary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: () => setState(() => _editing = true),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _AdminServicesPageState._primary,
+                      side: const BorderSide(
+                        color: _AdminServicesPageState._line,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Editar'),
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -446,139 +687,8 @@ class _MessageState extends StatelessWidget {
   }
 }
 
-class _AdminNavigation extends StatelessWidget {
-  const _AdminNavigation({required this.api});
-
-  final BarberApi api;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE7ECF2))),
-      ),
-      child: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 4),
-        child: SizedBox(
-          height: 58,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _AgendaNavItem(
-                label: 'Agenda',
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-              const _NavItem(
-                icon: Icons.content_cut_rounded,
-                label: 'Serviços',
-                active: true,
-              ),
-              _NavItem(
-                icon: Icons.people_outline_rounded,
-                label: 'Clientes',
-                onTap: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AdminClientsPage(api: api),
-                    ),
-                  );
-                },
-              ),
-              const _NavItem(icon: Icons.more_horiz_rounded, label: 'Mais'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AgendaNavItem extends StatelessWidget {
-  const _AgendaNavItem({required this.label, this.onTap});
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 68,
-        height: 58,
-        child: Center(
-          child: Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              color: _AdminServicesPageState._muted,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active
-        ? _AdminServicesPageState._primary
-        : _AdminServicesPageState._muted;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 68,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 30,
-              height: 26,
-              decoration: BoxDecoration(
-                color: active ? const Color(0xFFE4F6FF) : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 double _parsePrice(String value) {
-  final trimmed = value.trim();
+  final trimmed = value.replaceAll('R\$', '').trim();
   final normalized = trimmed.contains(',')
       ? trimmed.replaceAll('.', '').replaceAll(',', '.')
       : trimmed;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:barber_saas_mobile/models/appointment_data.dart';
+import 'package:barber_saas_mobile/features/admin/more/weekly_schedule_models.dart';
 import 'package:barber_saas_mobile/services/barber_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -114,6 +115,41 @@ void main() {
     expect(appointment.total, 70);
   });
 
+  test('atualiza o status do agendamento pelo endpoint administrativo',
+      () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'id': 'appointment-1',
+            'customerId': 'customer-1',
+            'serviceIds': ['service-1'],
+            'totalPrice': 40,
+            'appointmentDateTime': '2026-09-09T09:30:00',
+            'status': 'COMPLETED',
+            'createdAt': '2026-09-06T10:00:00',
+          }),
+          200,
+        );
+      }),
+    );
+
+    final appointment = await api.updateAppointmentStatus(
+      'appointment-1',
+      'COMPLETED',
+    );
+
+    expect(request.method, 'PATCH');
+    expect(
+      request.url.path,
+      '/api/v1/barbers/$barberId/appointments/appointment-1/status',
+    );
+    expect(jsonDecode(request.body), {'status': 'COMPLETED'});
+    expect(appointment.status, 'COMPLETED');
+  });
+
   test('normaliza horários públicos sem alterar a grade', () async {
     late http.Request request;
     final api = BarberApi(
@@ -170,6 +206,96 @@ void main() {
     expect(request.url.path, '/api/v1/barbers/$barberId/daily-agenda');
     expect(request.url.queryParameters['date'], '2026-09-09');
     expect(agenda.barberId, barberId);
+  });
+
+  test('consulta weekly-schedule administrativo do barber', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'weeklySchedule': [
+              {
+                'dayOfWeek': 'MONDAY',
+                'workingDay': true,
+                'startTime': '09:00:00',
+                'endTime': '18:00:00',
+                'breakStartTime': '12:00:00',
+                'breakEndTime': '13:00:00',
+              }
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+
+    final schedule = await api.weeklySchedule();
+
+    expect(request.method, 'GET');
+    expect(request.url.path, '/api/v1/barbers/$barberId/weekly-schedule');
+    expect(schedule.weeklySchedule.single.dayOfWeek, 'MONDAY');
+    expect(schedule.weeklySchedule.single.startTime, '09:00:00');
+  });
+
+  test('updateWeeklySchedule envia PUT com semana completa', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'weeklySchedule': [
+              {
+                'dayOfWeek': 'MONDAY',
+                'workingDay': true,
+                'startTime': '09:30:00',
+                'endTime': '20:00:00',
+                'breakStartTime': '12:00:00',
+                'breakEndTime': '14:00:00',
+              }
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+
+    await api.updateWeeklySchedule([
+      const WeeklyScheduleDay(
+        dayOfWeek: 'MONDAY',
+        workingDay: true,
+        startTime: '09:30:00',
+        endTime: '20:00:00',
+        breakStartTime: '12:00:00',
+        breakEndTime: '14:00:00',
+      ),
+      const WeeklyScheduleDay(dayOfWeek: 'TUESDAY', workingDay: false),
+    ]);
+
+    expect(request.method, 'PUT');
+    expect(request.url.path, '/api/v1/barbers/$barberId/weekly-schedule');
+    expect(jsonDecode(request.body), {
+      'weeklySchedule': [
+        {
+          'dayOfWeek': 'MONDAY',
+          'workingDay': true,
+          'startTime': '09:30:00',
+          'endTime': '20:00:00',
+          'breakStartTime': '12:00:00',
+          'breakEndTime': '14:00:00',
+        },
+        {
+          'dayOfWeek': 'TUESDAY',
+          'workingDay': false,
+          'startTime': null,
+          'endTime': null,
+          'breakStartTime': null,
+          'breakEndTime': null,
+        },
+      ],
+    });
   });
 
   test('adminServices consulta serviços no contexto administrativo do barber',
@@ -236,6 +362,42 @@ void main() {
     });
     expect(service.name, 'Corte');
     expect(service.price, 40);
+  });
+
+  test('updateAdminService envia PUT mínimo sem duração, descrição ou active',
+      () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'id': 'service-1',
+            'name': 'Corte Premium',
+            'description': 'Corte masculino',
+            'durationMinutes': 30,
+            'price': 55.5,
+            'active': true,
+          }),
+          200,
+        );
+      }),
+    );
+
+    final service = await api.updateAdminService(
+      serviceId: 'service-1',
+      name: 'Corte Premium',
+      price: 55.5,
+    );
+
+    expect(request.method, 'PUT');
+    expect(request.url.path, '/api/v1/barbers/$barberId/services/service-1');
+    expect(jsonDecode(request.body), {
+      'name': 'Corte Premium',
+      'price': 55.5,
+    });
+    expect(service.name, 'Corte Premium');
+    expect(service.price, 55.5);
   });
 
   test('deleteAdminService chama DELETE administrativo do barber', () async {
@@ -368,6 +530,42 @@ void main() {
     expect(customer.phone, '(13) 99999-9999');
   });
 
+  test('updateAdminCustomer envia PUT mínimo com nome e telefone', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(
+          jsonEncode({
+            'id': 'customer-1',
+            'name': 'Gabriel Santos',
+            'phone': '(13) 98888-7777',
+            'email': null,
+            'birthDate': null,
+            'notes': null,
+            'active': true,
+          }),
+          200,
+        );
+      }),
+    );
+
+    final customer = await api.updateAdminCustomer(
+      customerId: 'customer-1',
+      name: 'Gabriel Santos',
+      phone: '(13) 98888-7777',
+    );
+
+    expect(request.method, 'PUT');
+    expect(request.url.path, '/api/v1/barbers/$barberId/customers/customer-1');
+    expect(jsonDecode(request.body), {
+      'name': 'Gabriel Santos',
+      'phone': '(13) 98888-7777',
+    });
+    expect(customer.name, 'Gabriel Santos');
+    expect(customer.phone, '(13) 98888-7777');
+  });
+
   test('deleteAdminCustomer chama DELETE administrativo do barber', () async {
     late http.Request request;
     final api = BarberApi(
@@ -465,7 +663,53 @@ void main() {
           'message', 'Vaga de antecipação indisponível.')),
     );
   });
+
+  test('scheduleBlocks reutiliza endpoints administrativos existentes',
+      () async {
+    final requests = <http.Request>[];
+    final api = BarberApi(
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.method == 'POST') {
+          return http.Response(jsonEncode(_blockJson), 201);
+        }
+        if (request.method == 'DELETE') return http.Response('', 204);
+        return http.Response(jsonEncode([_blockJson]), 200);
+      }),
+    );
+
+    final blocks = await api.scheduleBlocks();
+    await api.createScheduleBlock(
+      startDateTime: DateTime(2026, 9, 10, 15),
+      endDateTime: DateTime(2026, 9, 10, 16),
+      reason: 'Banco',
+    );
+    await api.deleteScheduleBlock('block-1');
+
+    expect(blocks.single.reason, 'Dentista');
+    expect(requests[0].method, 'GET');
+    expect(requests[0].url.path, '/api/v1/barbers/$barberId/schedule-blocks');
+    expect(requests[1].method, 'POST');
+    expect(jsonDecode(requests[1].body), {
+      'startDateTime': '2026-09-10T15:00:00',
+      'endDateTime': '2026-09-10T16:00:00',
+      'reason': 'Banco',
+    });
+    expect(requests[2].method, 'DELETE');
+    expect(
+      requests[2].url.path,
+      '/api/v1/barbers/$barberId/schedule-blocks/block-1',
+    );
+  });
 }
+
+const _blockJson = {
+  'id': 'block-1',
+  'startDateTime': '2026-09-09T13:00:00',
+  'endDateTime': '2026-09-09T14:00:00',
+  'reason': 'Dentista',
+  'createdAt': '2026-09-01T10:00:00',
+};
 
 const _interestJson = {
   'id': 'interest-1',

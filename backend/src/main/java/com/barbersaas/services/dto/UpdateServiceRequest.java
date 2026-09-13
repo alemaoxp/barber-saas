@@ -12,7 +12,6 @@ public class UpdateServiceRequest {
     @Size(max = 500, message = "Descrição não pode exceder 500 caracteres")
     private String description;
 
-    @NotNull(message = "Duração é obrigatória")
     @Min(value = 1, message = "Duração deve ser pelo menos 1 minuto")
     @Max(value = 480, message = "Duração não pode exceder 480 minutos")
     private Integer durationMinutes;
@@ -22,7 +21,6 @@ public class UpdateServiceRequest {
     @Digits(integer = 5, fraction = 2, message = "Preço deve ter até 5 dígitos inteiros e 2 decimais")
     private BigDecimal price;
 
-    @NotNull(message = "Status ativo é obrigatório")
     private Boolean active;
 
     // Getters and Setters

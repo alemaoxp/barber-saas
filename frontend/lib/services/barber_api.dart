@@ -7,6 +7,8 @@ import '../models/availability_interest.dart';
 import '../models/booking_service.dart';
 import '../features/admin/daily_agenda/daily_agenda_models.dart';
 import '../features/admin/daily_agenda/models/admin_customer_summary.dart';
+import '../features/admin/more/weekly_schedule_models.dart';
+import '../features/admin/more/schedule_block_models.dart';
 import 'push_test_client.dart';
 
 const apiBaseUrl = 'http://localhost:8080';
@@ -63,6 +65,25 @@ class BarberApi {
     );
   }
 
+  Future<BookingService> updateAdminService({
+    required String serviceId,
+    required String name,
+    required double price,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services/$serviceId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'price': price,
+      }),
+    );
+    _ensureSuccess(response);
+    return BookingService.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   Future<List<String>> availableSlots(DateTime date) async {
     final day = _dateOnly(date);
     final response = await _client.get(Uri.parse(
@@ -83,6 +104,68 @@ class BarberApi {
     _ensureSuccess(response);
     return DailyAgendaResponse.fromJson(
         jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<WeeklyScheduleResponse> weeklySchedule() async {
+    final response = await _client.get(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/weekly-schedule'),
+    );
+    _ensureSuccess(response);
+    return WeeklyScheduleResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<WeeklyScheduleResponse> updateWeeklySchedule(
+    List<WeeklyScheduleDay> weeklySchedule,
+  ) async {
+    final response = await _client.put(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/weekly-schedule'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'weeklySchedule': weeklySchedule.map((day) => day.toJson()).toList(),
+      }),
+    );
+    _ensureSuccess(response);
+    return WeeklyScheduleResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<List<ScheduleBlock>> scheduleBlocks() async {
+    final response = await _client.get(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/schedule-blocks'),
+    );
+    return _list(response, ScheduleBlock.fromJson);
+  }
+
+  Future<ScheduleBlock> createScheduleBlock({
+    required DateTime startDateTime,
+    required DateTime endDateTime,
+    String? reason,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/schedule-blocks'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'startDateTime': _isoLocal(startDateTime),
+        'endDateTime': _isoLocal(endDateTime),
+        'reason': reason?.isEmpty == true ? null : reason,
+      }),
+    );
+    _ensureSuccess(response, expectedStatus: 201);
+    return ScheduleBlock.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> deleteScheduleBlock(String scheduleBlockId) async {
+    final response = await _client.delete(
+      Uri.parse(
+        '$apiBaseUrl/api/v1/barbers/$barberId/schedule-blocks/$scheduleBlockId',
+      ),
+    );
+    _ensureSuccess(response, expectedStatus: 204);
   }
 
   Future<List<AdminCustomerSummary>> adminCustomers({String? query}) async {
@@ -112,6 +195,25 @@ class BarberApi {
       }),
     );
     _ensureSuccess(response, expectedStatus: 201);
+    return AdminCustomerSummary.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<AdminCustomerSummary> updateAdminCustomer({
+    required String customerId,
+    required String name,
+    required String phone,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/customers/$customerId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'name': name,
+        'phone': phone,
+      }),
+    );
+    _ensureSuccess(response);
     return AdminCustomerSummary.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
@@ -160,6 +262,23 @@ class BarberApi {
       }),
     );
     _ensureSuccess(response, expectedStatus: 201);
+    return AppointmentData.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<AppointmentData> updateAppointmentStatus(
+    String appointmentId,
+    String status,
+  ) async {
+    final response = await _client.patch(
+      Uri.parse(
+        '$apiBaseUrl/api/v1/barbers/$barberId/appointments/$appointmentId/status',
+      ),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'status': status}),
+    );
+    _ensureSuccess(response);
     return AppointmentData.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );

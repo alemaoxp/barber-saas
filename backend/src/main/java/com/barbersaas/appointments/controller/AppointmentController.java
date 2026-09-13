@@ -3,6 +3,7 @@ package com.barbersaas.appointments.controller;
 import com.barbersaas.appointments.dto.AppointmentResponse;
 import com.barbersaas.appointments.dto.CreateAppointmentRequest;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
+import com.barbersaas.appointments.dto.UpdateAppointmentStatusRequest;
 import com.barbersaas.appointments.service.AppointmentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -92,6 +93,19 @@ public class AppointmentController {
                 );
 
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{appointmentId}/status")
+    public ResponseEntity<AppointmentResponse> updateStatus(
+            @PathVariable UUID barberId,
+            @PathVariable UUID appointmentId,
+            @Valid @RequestBody UpdateAppointmentStatusRequest request) {
+
+        return ResponseEntity.ok(appointmentService.updateStatus(
+                barberId,
+                appointmentId,
+                request.getStatus()
+        ));
     }
 
     @DeleteMapping("/{appointmentId}")

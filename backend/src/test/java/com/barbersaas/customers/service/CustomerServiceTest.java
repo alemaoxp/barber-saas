@@ -4,6 +4,7 @@ import com.barbersaas.barbers.repository.BarberRepository;
 import com.barbersaas.barbers.entity.BarberEntity;
 import com.barbersaas.barbershops.entity.BarbershopEntity;
 import com.barbersaas.customers.dto.CustomerSummaryResponse;
+import com.barbersaas.customers.dto.UpdateCustomerRequest;
 import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.customers.mapper.CustomerMapper;
 import com.barbersaas.customers.repository.CustomerRepository;
@@ -18,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -243,6 +245,59 @@ class CustomerServiceTest {
         assertEquals(false, customer.getActive());
         verify(customerRepository).save(customer);
         verify(customerRepository, never()).delete(customer);
+    }
+
+    @Test
+    void updateShouldChangeOnlyNameAndPhoneKeepingHiddenFields() {
+        CustomerEntity customer = customer(
+                CUSTOMER_ID,
+                "Gabriel Santana",
+                "(13) 99999-9999"
+        );
+        customer.setEmail("gabriel@example.com");
+        customer.setBirthDate(LocalDate.of(1990, 1, 1));
+        customer.setNotes("Observacao original");
+        customer.setActive(false);
+        customer.setBarbershop(new BarbershopEntity(BARBER_ID, "Jhow Cortes", true));
+        UpdateCustomerRequest request = new UpdateCustomerRequest();
+        request.setName("Gabriel Santos");
+        request.setPhone("(13) 98888-7777");
+        request.setEmail("novo@example.com");
+        request.setBirthDate(LocalDate.of(2000, 2, 2));
+        request.setNotes("Alterada");
+        request.setActive(true);
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(customerRepository.save(customer)).thenReturn(customer);
+
+        var response = customerService.update(BARBER_ID, CUSTOMER_ID, request);
+
+        assertEquals("Gabriel Santos", response.getName());
+        assertEquals("(13) 98888-7777", response.getPhone());
+        assertEquals("gabriel@example.com", customer.getEmail());
+        assertEquals(LocalDate.of(1990, 1, 1), customer.getBirthDate());
+        assertEquals("Observacao original", customer.getNotes());
+        assertEquals(false, customer.getActive());
+        verify(customerRepository).save(customer);
+    }
+
+    @Test
+    void updateShouldRejectCustomerFromAnotherBarbershop() {
+        CustomerEntity customer = customer(
+                CUSTOMER_ID,
+                "Gabriel Santana",
+                "(13) 99999-9999"
+        );
+        customer.setBarbershop(new BarbershopEntity(UUID.randomUUID(), "Outra", true));
+        UpdateCustomerRequest request = new UpdateCustomerRequest();
+        request.setName("Gabriel Santos");
+        request.setPhone("(13) 98888-7777");
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+
+        assertThrows(
+                NotFoundException.class,
+                () -> customerService.update(BARBER_ID, CUSTOMER_ID, request)
+        );
+        verify(customerRepository, never()).save(customer);
     }
 
     private CustomerEntity customer(UUID id, String name, String phone) {

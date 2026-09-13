@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -162,6 +163,26 @@ class AppointmentControllerTest {
                         APPOINTMENT_ID
                 ))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void scheduledAppointmentStatusCanBeUpdatedByTheAdmin() throws Exception {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
+        when(appointmentService.updateStatus(
+                BARBER_ID,
+                APPOINTMENT_ID,
+                AppointmentStatus.NO_SHOW
+        )).thenReturn(response(dateTime));
+
+        mockMvc.perform(patch(
+                        "/api/v1/barbers/{barberId}/appointments/{appointmentId}/status",
+                        BARBER_ID,
+                        APPOINTMENT_ID
+                )
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"NO_SHOW\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("SCHEDULED")));
     }
 
     private AppointmentResponse response(LocalDateTime dateTime) {

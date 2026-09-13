@@ -780,6 +780,28 @@ public class AppointmentService {
         );
     }
 
+    public AppointmentResponse updateStatus(
+            UUID barberId,
+            UUID appointmentId,
+            AppointmentStatus status) {
+
+        BarberEntity barber = findBarber(barberId);
+        AppointmentEntity appointment = findAppointment(appointmentId, barber.getId());
+
+        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
+            throw new BusinessException(
+                    "Somente agendamentos pendentes podem ter o status alterado."
+            );
+        }
+
+        if (status != AppointmentStatus.COMPLETED && status != AppointmentStatus.NO_SHOW) {
+            throw new BusinessException("Status de atendimento inválido.");
+        }
+
+        appointment.setStatus(status);
+        return appointmentMapper.toResponse(appointmentRepository.save(appointment));
+    }
+
     @Transactional
     public void cancelByToken(UUID token) {
 

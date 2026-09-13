@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:barber_saas_mobile/features/admin/clients/admin_clients_page.dart';
@@ -133,6 +134,115 @@ void main() {
     });
     expect(find.text('Gabriel Santana'), findsOneWidget);
     expect(find.text('(13) 99999-9999'), findsOneWidget);
+  });
+
+  testWidgets('tocar no cliente abre detalhes e edita com formatter',
+      (tester) async {
+    var listRequestCount = 0;
+    late http.Request putRequest;
+    final api = BarberApi(
+      client: MockClient((request) async {
+        if (request.method == 'PUT') {
+          putRequest = request;
+          return http.Response(jsonEncode(_updatedClientJson), 200);
+        }
+        listRequestCount++;
+        return http.Response(
+          jsonEncode(listRequestCount == 1
+              ? _clientsJson
+              : [_updatedClientJson, _clientsJson[1]]),
+          200,
+        );
+      }),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: AdminClientsPage(api: api)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gabriel Santana'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gabriel Santana'), findsWidgets);
+    expect(find.text('(13) 99999-9999'), findsWidgets);
+    await tester.tap(find.text('Editar'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TextFormField, 'Nome'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Telefone'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nome'),
+      'Gabriel Santos',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Telefone'),
+      '13988887777',
+    );
+    await tester.tap(find.text('Salvar alterações'));
+    await tester.pumpAndSettle();
+
+    expect(putRequest.method, 'PUT');
+    expect(
+      putRequest.url.path,
+      '/api/v1/barbers/$barberId/customers/customer-1',
+    );
+    expect(jsonDecode(putRequest.body), {
+      'name': 'Gabriel Santos',
+      'phone': '(13) 98888-7777',
+    });
+    expect(find.text('Gabriel Santos'), findsOneWidget);
+    expect(find.text('(13) 98888-7777'), findsOneWidget);
+  });
+
+  testWidgets('edição de cliente valida, mostra loading e trata erro',
+      (tester) async {
+    final putResponse = Completer<http.Response>();
+    var putCalls = 0;
+    final api = BarberApi(
+      client: MockClient((request) async {
+        if (request.method == 'PUT') {
+          putCalls++;
+          return putResponse.future;
+        }
+        return http.Response(jsonEncode(_clientsJson), 200);
+      }),
+    );
+
+    await tester.pumpWidget(MaterialApp(home: AdminClientsPage(api: api)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gabriel Santana'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Nome'), '');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Telefone'), '123');
+    await tester.tap(find.text('Salvar alterações'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Informe o nome.'), findsOneWidget);
+    expect(find.text('Informe um telefone válido.'), findsOneWidget);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Nome'), 'Gabriel');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Telefone'),
+      '13999999999',
+    );
+    await tester.tap(find.text('Salvar alterações'));
+    await tester.pump();
+
+    expect(find.text('Salvando...'), findsOneWidget);
+    await tester.tap(find.text('Salvando...'));
+    await tester.pump();
+    expect(putCalls, 1);
+
+    putResponse.complete(
+      http.Response(jsonEncode({'error': 'Telefone já existe.'}), 409),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Telefone já existe.'), findsOneWidget);
+    expect(find.text('Editar cliente'), findsOneWidget);
   });
 
   testWidgets('swipe para esquerda configura fundo de exclusão do cliente',
@@ -273,6 +383,16 @@ const _createdClientJson = {
   'id': 'customer-1',
   'name': 'Gabriel Santana',
   'phone': '(13) 99999-9999',
+  'email': null,
+  'birthDate': null,
+  'notes': null,
+  'active': true,
+};
+
+const _updatedClientJson = {
+  'id': 'customer-1',
+  'name': 'Gabriel Santos',
+  'phone': '(13) 98888-7777',
   'email': null,
   'birthDate': null,
   'notes': null,

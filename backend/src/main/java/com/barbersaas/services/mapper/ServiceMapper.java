@@ -21,10 +21,7 @@ public class ServiceMapper {
 
     public void updateEntity(ServiceEntity entity, UpdateServiceRequest request) {
         entity.setName(request.getName());
-        entity.setDescription(request.getDescription());
-        entity.setDurationMinutes(request.getDurationMinutes());
         entity.setPrice(request.getPrice());
-        entity.setActive(request.getActive());
     }
 
     public ServiceResponse toResponse(ServiceEntity entity) {

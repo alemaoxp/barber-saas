@@ -66,6 +66,26 @@ class DailyAgendaSlot {
   }
 }
 
+String appointmentStatusLabel(DailyAgendaSlot slot, DateTime now) {
+  switch (slot.appointmentStatus) {
+    case 'COMPLETED':
+      return 'Concluído';
+    case 'CANCELED':
+      return 'Cancelado';
+    case 'NO_SHOW':
+      return 'Não compareceu';
+    case 'SCHEDULED':
+      final duration = slot.dateTime.weekday == DateTime.monday ? 40 : 30;
+      if (now.isBefore(slot.dateTime)) return 'Agendado';
+      if (now.isBefore(slot.dateTime.add(Duration(minutes: duration)))) {
+        return 'Em atendimento';
+      }
+      return 'Pendente';
+    default:
+      return slot.appointmentStatus ?? 'Agendado';
+  }
+}
+
 enum DailyAgendaSlotStatus {
   free,
   occupied,

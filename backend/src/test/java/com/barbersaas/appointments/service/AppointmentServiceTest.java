@@ -406,6 +406,51 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void scheduledAppointmentCanBeMarkedAsCompletedWithoutReleasingTheSlot() {
+        AppointmentEntity appointment = existingAppointment(
+                LocalDateTime.of(2026, 9, 2, 10, 0),
+                40,
+                AppointmentStatus.SCHEDULED
+        );
+        when(appointmentRepository.findByIdAndBarberId(APPOINTMENT_ID, BARBER_ID))
+                .thenReturn(Optional.of(appointment));
+
+        appointmentService.updateStatus(
+                BARBER_ID,
+                APPOINTMENT_ID,
+                AppointmentStatus.COMPLETED
+        );
+
+        assertEquals(AppointmentStatus.COMPLETED, appointment.getStatus());
+        verify(appointmentRepository).save(appointment);
+        verifyNoMoreInteractions(availableSlotService);
+    }
+
+    @Test
+    void terminalAppointmentCannotBeMarkedAsNoShow() {
+        AppointmentEntity appointment = existingAppointment(
+                LocalDateTime.of(2026, 9, 2, 10, 0),
+                40,
+                AppointmentStatus.CANCELED
+        );
+        when(appointmentRepository.findByIdAndBarberId(APPOINTMENT_ID, BARBER_ID))
+                .thenReturn(Optional.of(appointment));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.updateStatus(
+                        BARBER_ID,
+                        APPOINTMENT_ID,
+                        AppointmentStatus.NO_SHOW
+                )
+        );
+
+        assertEquals("Somente agendamentos pendentes podem ter o status alterado.",
+                exception.getMessage());
+        verify(appointmentRepository, never()).save(appointment);
+    }
+
+    @Test
     void mondayAvailableSlotsShouldMatchOfficialSchedule() {
         LocalDate monday = LocalDate.of(2026, 8, 31);
         when(weeklyScheduleService.getWorkingSchedule(BARBER_ID, DayOfWeek.MONDAY))

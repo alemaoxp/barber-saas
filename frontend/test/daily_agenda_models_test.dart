@@ -59,4 +59,36 @@ void main() {
       throwsA(isA<TypeError>()),
     );
   });
+
+  test('traduz o estado operacional sem mudar o status persistido', () {
+    final scheduled = DailyAgendaSlot(
+      dateTime: DateTime(2026, 9, 9, 10),
+      status: DailyAgendaSlotStatus.occupied,
+      appointmentStatus: 'SCHEDULED',
+    );
+
+    expect(
+      appointmentStatusLabel(scheduled, DateTime(2026, 9, 9, 9, 59)),
+      'Agendado',
+    );
+    expect(
+      appointmentStatusLabel(scheduled, DateTime(2026, 9, 9, 10, 15)),
+      'Em atendimento',
+    );
+    expect(
+      appointmentStatusLabel(scheduled, DateTime(2026, 9, 9, 10, 30)),
+      'Pendente',
+    );
+    expect(
+      appointmentStatusLabel(
+        DailyAgendaSlot(
+          dateTime: DateTime(2026, 9, 9, 10),
+          status: DailyAgendaSlotStatus.occupied,
+          appointmentStatus: 'NO_SHOW',
+        ),
+        DateTime(2026, 9, 9, 11),
+      ),
+      'Não compareceu',
+    );
+  });
 }
