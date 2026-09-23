@@ -42,7 +42,7 @@ public class AvailabilityInterestController {
     public ResponseEntity<AvailabilityInterestResponse> findById(
             @PathVariable UUID customerId,
             @PathVariable UUID interestId) {
-        return ResponseEntity.ok(availabilityInterestService.findById(interestId));
+        return ResponseEntity.ok(availabilityInterestService.findById(customerId, interestId));
     }
 
     @GetMapping("/active")

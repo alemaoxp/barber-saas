@@ -4,8 +4,10 @@ import com.barbersaas.barbers.dto.CreateBarberRequest;
 import com.barbersaas.barbers.dto.BarberResponse;
 import com.barbersaas.barbers.dto.UpdateBarberRequest;
 import com.barbersaas.barbers.service.BarberService;
+import com.barbersaas.auth.AdminPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,34 +25,42 @@ public class BarberController {
     }
 
     @PostMapping
-    public ResponseEntity<BarberResponse> create(@Valid @RequestBody CreateBarberRequest request) {
-        BarberResponse response = barberService.create(request);
+    public ResponseEntity<BarberResponse> create(
+            @Valid @RequestBody CreateBarberRequest request,
+            @AuthenticationPrincipal AdminPrincipal adminPrincipal) {
+        BarberResponse response = barberService.create(adminPrincipal.barbershopId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<BarberResponse>> findAll() {
-        List<BarberResponse> responses = barberService.findAll();
+    public ResponseEntity<List<BarberResponse>> findAll(
+            @AuthenticationPrincipal AdminPrincipal adminPrincipal) {
+        List<BarberResponse> responses = barberService.findAll(adminPrincipal.barbershopId());
         return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BarberResponse> findById(@PathVariable UUID id) {
-        BarberResponse response = barberService.findById(id);
+    public ResponseEntity<BarberResponse> findById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AdminPrincipal adminPrincipal) {
+        BarberResponse response = barberService.findById(adminPrincipal.barbershopId(), id);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<BarberResponse> update(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateBarberRequest request) {
-        BarberResponse response = barberService.update(id, request);
+            @Valid @RequestBody UpdateBarberRequest request,
+            @AuthenticationPrincipal AdminPrincipal adminPrincipal) {
+        BarberResponse response = barberService.update(adminPrincipal.barbershopId(), id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        barberService.delete(id);
+    public ResponseEntity<Void> delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AdminPrincipal adminPrincipal) {
+        barberService.delete(adminPrincipal.barbershopId(), id);
         return ResponseEntity.noContent().build();
     }
 }

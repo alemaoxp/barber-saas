@@ -87,6 +87,7 @@ public class AvailabilityInterestService {
                         );
 
         validateAppointment(customer, appointment);
+        validateTenantConsistency(customer, appointment);
 
         boolean alreadyExists =
                 availabilityInterestRepository
@@ -117,6 +118,7 @@ public class AvailabilityInterestService {
     }
 
     public AvailabilityInterestResponse findById(
+            UUID customerId,
             UUID interestId) {
 
         AvailabilityInterestEntity entity =
@@ -128,6 +130,12 @@ public class AvailabilityInterestService {
                                         "Solicitação de antecipação não encontrada."
                                 )
                         );
+
+        if (!entity.getCustomer().getId().equals(customerId)) {
+            throw new NotFoundException(
+                    "Solicitação de antecipação não encontrada."
+            );
+        }
 
         return availabilityInterestMapper.toResponse(
                 entity
@@ -395,6 +403,39 @@ public class AvailabilityInterestService {
 
             throw new BusinessException(
                     "Somente agendamentos futuros podem entrar na fila de antecipação."
+            );
+        }
+    }
+
+    private void validateTenantConsistency(
+            CustomerEntity customer,
+            AppointmentEntity appointment) {
+
+        UUID customerBarbershopId = customer.getBarbershop() == null
+                ? null
+                : customer.getBarbershop().getId();
+        UUID appointmentCustomerBarbershopId = appointment.getCustomer() == null
+                || appointment.getCustomer().getBarbershop() == null
+                ? null
+                : appointment.getCustomer().getBarbershop().getId();
+        UUID barberBarbershopId = appointment.getBarber() == null
+                || appointment.getBarber().getBarbershop() == null
+                ? null
+                : appointment.getBarber().getBarbershop().getId();
+
+        boolean servicesBelongToCustomerBarbershop = appointment.getServices() != null
+                && appointment.getServices().stream().allMatch(service ->
+                service != null
+                        && service.getBarbershop() != null
+                        && customerBarbershopId != null
+                        && customerBarbershopId.equals(service.getBarbershop().getId()));
+
+        if (customerBarbershopId == null
+                || !customerBarbershopId.equals(appointmentCustomerBarbershopId)
+                || !customerBarbershopId.equals(barberBarbershopId)
+                || !servicesBelongToCustomerBarbershop) {
+            throw new BusinessException(
+                    "As entidades do agendamento devem pertencer à mesma barbearia."
             );
         }
     }

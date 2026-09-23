@@ -53,6 +53,30 @@ class BarbershopAccessFilterTest {
         verify(chain).doFilter(eq(request), any());
     }
 
+    @Test
+    void shouldForbidDirectBarberEndpointFromAnotherBarbershop() throws Exception {
+        UUID adminShopId = UUID.randomUUID();
+        UUID foreignBarberId = UUID.randomUUID();
+        BarberRepository barbers = mock(BarberRepository.class);
+        when(barbers.findById(foreignBarberId))
+                .thenReturn(Optional.of(barber(foreignBarberId, UUID.randomUUID())));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal(adminShopId), null)
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/api/v1/barbers/" + foreignBarberId
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        new BarbershopAccessFilter(barbers).doFilter(request, response, chain);
+
+        assertEquals(403, response.getStatus());
+        verify(chain, never()).doFilter(request, response);
+    }
+
     private AdminPrincipal principal(UUID shopId) {
         var shop = new BarbershopEntity(shopId, "Jhow Cortes", true);
         var user = new AdminUserEntity(shop, "Admin", "admin@example.com", "hash", true);

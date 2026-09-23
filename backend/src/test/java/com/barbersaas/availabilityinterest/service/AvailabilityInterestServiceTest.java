@@ -10,14 +10,17 @@ import com.barbersaas.availableslot.repository.AvailableSlotRepository;
 import com.barbersaas.availabilityinterest.dto.AcceptAvailabilityInterestRequest;
 import com.barbersaas.availabilityinterest.dto.AvailabilityInterestResponse;
 import com.barbersaas.availabilityinterest.dto.AvailabilityOpportunityResponse;
+import com.barbersaas.availabilityinterest.dto.CreateAvailabilityInterestRequest;
 import com.barbersaas.availabilityinterest.entity.AvailabilityInterestEntity;
 import com.barbersaas.availabilityinterest.enums.AvailabilityInterestStatus;
 import com.barbersaas.availabilityinterest.mapper.AvailabilityInterestMapper;
 import com.barbersaas.availabilityinterest.repository.AvailabilityInterestRepository;
 import com.barbersaas.barbers.entity.BarberEntity;
+import com.barbersaas.barbershops.entity.BarbershopEntity;
 import com.barbersaas.customers.entity.CustomerEntity;
 import com.barbersaas.customers.repository.CustomerRepository;
 import com.barbersaas.exception.BusinessException;
+import com.barbersaas.exception.NotFoundException;
 import com.barbersaas.services.entity.ServiceEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,6 +64,10 @@ class AvailabilityInterestServiceTest {
             UUID.fromString("00000000-0000-0000-0000-000000000006");
     private static final UUID OTHER_BARBER_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000007");
+    private static final UUID SHOP_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000010");
+    private static final UUID OTHER_SHOP_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000011");
 
     @Mock
     private AvailabilityInterestRepository availabilityInterestRepository;
@@ -100,12 +107,108 @@ class AvailabilityInterestServiceTest {
         customer = customer();
         barber = barber();
         service = service();
+        BarbershopEntity shop = new BarbershopEntity(SHOP_ID, "Shop", true);
+        customer.setBarbershop(shop);
+        barber.setBarbershop(shop);
+        service.setBarbershop(shop);
         appointment = appointment(LocalDateTime.now().plusDays(3));
         slot = slot(LocalDateTime.now().plusDays(1));
         interest = new AvailabilityInterestEntity(customer, appointment);
         interest.setCreatedAt(LocalDateTime.now().minusHours(1));
         slot.setCreatedAt(LocalDateTime.now().minusMinutes(30));
         ReflectionTestUtils.setField(interest, "id", INTEREST_ID);
+    }
+
+    @Test
+    void createAllowsAppointmentWhoseEntitiesShareTheCustomerBarbershop() {
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(appointmentRepository.findById(APPOINTMENT_ID)).thenReturn(Optional.of(appointment));
+        when(availabilityInterestRepository.existsByCustomerIdAndAppointmentIdAndStatus(
+                CUSTOMER_ID, APPOINTMENT_ID, AvailabilityInterestStatus.ACTIVE)).thenReturn(false);
+        when(availabilityInterestRepository.save(any(AvailabilityInterestEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateAvailabilityInterestRequest request = new CreateAvailabilityInterestRequest();
+        request.setAppointmentId(APPOINTMENT_ID);
+        AvailabilityInterestResponse response = availabilityInterestService.create(CUSTOMER_ID, request);
+
+        assertEquals(AvailabilityInterestStatus.ACTIVE, response.getStatus());
+        verify(availabilityInterestRepository).save(any(AvailabilityInterestEntity.class));
+    }
+
+    @Test
+    void createRejectsAppointmentWhoseBarberBelongsToAnotherBarbershop() {
+        BarberEntity foreignBarber = otherBarber();
+        foreignBarber.setBarbershop(new BarbershopEntity(OTHER_SHOP_ID, "Other Shop", true));
+        appointment.setBarber(foreignBarber);
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(appointmentRepository.findById(APPOINTMENT_ID)).thenReturn(Optional.of(appointment));
+
+        CreateAvailabilityInterestRequest request = new CreateAvailabilityInterestRequest();
+        request.setAppointmentId(APPOINTMENT_ID);
+        assertThrows(BusinessException.class, () -> availabilityInterestService.create(CUSTOMER_ID, request));
+        verify(availabilityInterestRepository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsAppointmentWithServiceFromAnotherBarbershop() {
+        ServiceEntity foreignService = service();
+        foreignService.setBarbershop(new BarbershopEntity(OTHER_SHOP_ID, "Other Shop", true));
+        appointment.setServices(List.of(foreignService));
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(appointmentRepository.findById(APPOINTMENT_ID)).thenReturn(Optional.of(appointment));
+
+        CreateAvailabilityInterestRequest request = new CreateAvailabilityInterestRequest();
+        request.setAppointmentId(APPOINTMENT_ID);
+        assertThrows(BusinessException.class, () -> availabilityInterestService.create(CUSTOMER_ID, request));
+        verify(availabilityInterestRepository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsAppointmentOwnedByAnotherCustomer() {
+        CustomerEntity otherCustomer = customer();
+        ReflectionTestUtils.setField(otherCustomer, "id", OTHER_CUSTOMER_ID);
+        otherCustomer.setBarbershop(customer.getBarbershop());
+        appointment.setCustomer(otherCustomer);
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(appointmentRepository.findById(APPOINTMENT_ID)).thenReturn(Optional.of(appointment));
+
+        CreateAvailabilityInterestRequest request = new CreateAvailabilityInterestRequest();
+        request.setAppointmentId(APPOINTMENT_ID);
+        assertThrows(BusinessException.class, () -> availabilityInterestService.create(CUSTOMER_ID, request));
+        verify(availabilityInterestRepository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsCanceledAppointment() {
+        appointment.setStatus(AppointmentStatus.CANCELED);
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(appointmentRepository.findById(APPOINTMENT_ID)).thenReturn(Optional.of(appointment));
+
+        CreateAvailabilityInterestRequest request = new CreateAvailabilityInterestRequest();
+        request.setAppointmentId(APPOINTMENT_ID);
+        assertThrows(BusinessException.class, () -> availabilityInterestService.create(CUSTOMER_ID, request));
+        verify(availabilityInterestRepository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsPastAppointment() {
+        appointment.setAppointmentDateTime(LocalDateTime.now().minusMinutes(1));
+        when(customerRepository.findById(CUSTOMER_ID)).thenReturn(Optional.of(customer));
+        when(appointmentRepository.findById(APPOINTMENT_ID)).thenReturn(Optional.of(appointment));
+
+        CreateAvailabilityInterestRequest request = new CreateAvailabilityInterestRequest();
+        request.setAppointmentId(APPOINTMENT_ID);
+        assertThrows(BusinessException.class, () -> availabilityInterestService.create(CUSTOMER_ID, request));
+        verify(availabilityInterestRepository, never()).save(any());
+    }
+
+    @Test
+    void findByIdRejectsInterestWhenRouteCustomerDoesNotOwnIt() {
+        when(availabilityInterestRepository.findById(INTEREST_ID)).thenReturn(Optional.of(interest));
+
+        assertThrows(NotFoundException.class,
+                () -> availabilityInterestService.findById(OTHER_CUSTOMER_ID, INTEREST_ID));
     }
 
     @Test

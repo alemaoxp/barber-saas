@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.barbersaas.weeklyschedule.repository.WeeklyScheduleRepository;
 import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
+import com.barbersaas.barbershops.repository.BarbershopRepository;
+import com.barbersaas.exception.NotFoundException;
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 
@@ -27,20 +29,25 @@ public class BarberService {
     private final BarberMapper barberMapper;
     private final BarberScheduleRepository barberScheduleRepository;
     private final WeeklyScheduleRepository weeklyScheduleRepository;
+    private final BarbershopRepository barbershopRepository;
 
     public BarberService(
             BarberRepository barberRepository,
             BarberMapper barberMapper,
             BarberScheduleRepository barberScheduleRepository,
-            WeeklyScheduleRepository weeklyScheduleRepository) {
+            WeeklyScheduleRepository weeklyScheduleRepository,
+            BarbershopRepository barbershopRepository) {
         this.barberRepository = barberRepository;
         this.barberMapper = barberMapper;
         this.barberScheduleRepository = barberScheduleRepository;
         this.weeklyScheduleRepository = weeklyScheduleRepository;
+        this.barbershopRepository = barbershopRepository;
     }
 
-    public BarberResponse create(CreateBarberRequest request) {
+    public BarberResponse create(UUID barbershopId, CreateBarberRequest request) {
         BarberEntity entity = barberMapper.toEntity(request);
+        entity.setBarbershop(barbershopRepository.findById(barbershopId)
+                .orElseThrow(() -> new NotFoundException("Barbearia não encontrada.")));
         BarberEntity savedEntity = barberRepository.save(entity);
         
         // Criar configuração de agenda automaticamente para o barbeiro
@@ -49,22 +56,22 @@ public class BarberService {
         return barberMapper.toResponse(savedEntity);
     }
 
-    public List<BarberResponse> findAll() {
-        return barberRepository.findAll()
+    public List<BarberResponse> findAll(UUID barbershopId) {
+        return barberRepository.findByBarbershopId(barbershopId)
                 .stream()
                 .map(barberMapper::toResponse)
                 .collect(Collectors.toList());
     }
 
-    public BarberResponse findById(UUID id) {
-        return barberRepository.findById(id)
+    public BarberResponse findById(UUID barbershopId, UUID id) {
+        return barberRepository.findByIdAndBarbershopId(id, barbershopId)
                 .map(barberMapper::toResponse)
-                .orElseThrow(() -> new RuntimeException("Barbeiro não encontrado."));
+                .orElseThrow(() -> new NotFoundException("Barbeiro não encontrado."));
     }
 
-    public BarberResponse update(UUID id, UpdateBarberRequest request) {
-        BarberEntity entity = barberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Barbeiro não encontrado."));
+    public BarberResponse update(UUID barbershopId, UUID id, UpdateBarberRequest request) {
+        BarberEntity entity = barberRepository.findByIdAndBarbershopId(id, barbershopId)
+                .orElseThrow(() -> new NotFoundException("Barbeiro não encontrado."));
         
         barberMapper.updateEntity(entity, request);
         BarberEntity updatedEntity = barberRepository.save(entity);
@@ -72,9 +79,9 @@ public class BarberService {
         return barberMapper.toResponse(updatedEntity);
     }
 
-    public void delete(UUID id) {
-        BarberEntity entity = barberRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Barbeiro não encontrado."));
+    public void delete(UUID barbershopId, UUID id) {
+        BarberEntity entity = barberRepository.findByIdAndBarbershopId(id, barbershopId)
+                .orElseThrow(() -> new NotFoundException("Barbeiro não encontrado."));
         
         barberRepository.delete(entity);
         System.out.println(
