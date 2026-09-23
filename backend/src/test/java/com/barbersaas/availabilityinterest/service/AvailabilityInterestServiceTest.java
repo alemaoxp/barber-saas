@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +53,8 @@ class AvailabilityInterestServiceTest {
             UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final UUID APPOINTMENT_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000004");
+    private static final UUID OTHER_APPOINTMENT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000008");
     private static final UUID BARBER_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000005");
     private static final UUID OTHER_CUSTOMER_ID =
@@ -100,6 +103,8 @@ class AvailabilityInterestServiceTest {
         appointment = appointment(LocalDateTime.now().plusDays(3));
         slot = slot(LocalDateTime.now().plusDays(1));
         interest = new AvailabilityInterestEntity(customer, appointment);
+        interest.setCreatedAt(LocalDateTime.now().minusHours(1));
+        slot.setCreatedAt(LocalDateTime.now().minusMinutes(30));
         ReflectionTestUtils.setField(interest, "id", INTEREST_ID);
     }
 
@@ -138,6 +143,53 @@ class AvailabilityInterestServiceTest {
         verify(availableSlotRepository).save(slot);
         verify(appointmentRepository).save(appointment);
         verify(availabilityInterestRepository).save(interest);
+    }
+
+    @Test
+    void acceptingOneInterestLeavesTheOtherAppointmentIntactAndMakesTheSlotUnavailable() {
+        AppointmentEntity otherAppointment = appointment(
+                LocalDateTime.now().plusDays(5));
+        ReflectionTestUtils.setField(otherAppointment, "id", OTHER_APPOINTMENT_ID);
+        AvailabilityInterestEntity otherInterest =
+                new AvailabilityInterestEntity(customer, otherAppointment);
+        ReflectionTestUtils.setField(otherInterest, "id", UUID.fromString(
+                "00000000-0000-0000-0000-000000000009"));
+
+        LocalDateTime otherAppointmentDateTime = otherAppointment.getAppointmentDateTime();
+        when(availabilityInterestRepository.findByIdForUpdate(INTEREST_ID))
+                .thenReturn(Optional.of(interest));
+        when(availableSlotRepository.findByIdForUpdate(SLOT_ID))
+                .thenReturn(Optional.of(slot));
+        when(appointmentRepository.findByIdForUpdate(APPOINTMENT_ID))
+                .thenReturn(Optional.of(appointment));
+        when(availabilityInterestRepository.save(interest))
+                .thenReturn(interest);
+
+        availabilityInterestService.accept(
+                CUSTOMER_ID,
+                INTEREST_ID,
+                new AcceptAvailabilityInterestRequest(SLOT_ID));
+
+        assertEquals(slot.getAvailableDateTime(), appointment.getAppointmentDateTime());
+        assertEquals(AvailableSlotStatus.BOOKED, slot.getStatus());
+        assertEquals(AvailabilityInterestStatus.COMPLETED, interest.getStatus());
+        assertEquals(otherAppointmentDateTime, otherAppointment.getAppointmentDateTime());
+        assertEquals(AvailabilityInterestStatus.ACTIVE, otherInterest.getStatus());
+
+        when(availabilityInterestRepository.findByIdForUpdate(otherInterest.getId()))
+                .thenReturn(Optional.of(otherInterest));
+        when(availableSlotRepository.findByIdForUpdate(SLOT_ID))
+                .thenReturn(Optional.of(slot));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> availabilityInterestService.accept(
+                        CUSTOMER_ID,
+                        otherInterest.getId(),
+                        new AcceptAvailabilityInterestRequest(SLOT_ID))
+        );
+
+        assertEquals("Vaga de antecipação indisponível.", exception.getMessage());
     }
 
     @Test
@@ -192,6 +244,8 @@ class AvailabilityInterestServiceTest {
 
     @Test
     void activeInterestShouldReturnEligibleOpportunity() {
+        interest.setCreatedAt(LocalDateTime.now().minusHours(1));
+        slot.setCreatedAt(LocalDateTime.now().minusMinutes(30));
         when(availabilityInterestRepository.findById(INTEREST_ID))
                 .thenReturn(Optional.of(interest));
         when(availableSlotRepository
@@ -219,6 +273,70 @@ class AvailabilityInterestServiceTest {
                         slot.getAvailableDateTime(),
                         APPOINTMENT_ID
                 );
+    }
+
+    @Test
+    void twoActiveInterestsOfTheSameCustomerSeeTheSameAvailableSlot() {
+        AppointmentEntity laterAppointment = appointment(
+                LocalDateTime.now().plusDays(5));
+        ReflectionTestUtils.setField(laterAppointment, "id", OTHER_APPOINTMENT_ID);
+        AvailabilityInterestEntity laterInterest =
+                new AvailabilityInterestEntity(customer, laterAppointment);
+        laterInterest.setCreatedAt(LocalDateTime.now().minusMinutes(50));
+        ReflectionTestUtils.setField(laterInterest, "id", UUID.fromString(
+                "00000000-0000-0000-0000-000000000009"));
+
+        when(availabilityInterestRepository.findById(INTEREST_ID))
+                .thenReturn(Optional.of(interest));
+        when(availabilityInterestRepository.findById(laterInterest.getId()))
+                .thenReturn(Optional.of(laterInterest));
+        when(availableSlotRepository
+                .findByBarberIdAndStatusAndAvailableDateTimeBetweenOrderByAvailableDateTimeAsc(
+                        eq(BARBER_ID),
+                        eq(AvailableSlotStatus.AVAILABLE),
+                        any(),
+                        any()
+                )).thenReturn(List.of(slot));
+
+        List<AvailabilityOpportunityResponse> firstOpportunities =
+                availabilityInterestService.findOpportunities(CUSTOMER_ID, INTEREST_ID);
+        List<AvailabilityOpportunityResponse> secondOpportunities =
+                availabilityInterestService.findOpportunities(CUSTOMER_ID, laterInterest.getId());
+
+        assertEquals(1, firstOpportunities.size());
+        assertEquals(1, secondOpportunities.size());
+        assertEquals(SLOT_ID, firstOpportunities.get(0).getAvailableSlotId());
+        assertEquals(SLOT_ID, secondOpportunities.get(0).getAvailableSlotId());
+    }
+
+    @Test
+    void opportunityCreatedBeforeInterestActivationShouldNotAppear() {
+        interest.setCreatedAt(LocalDateTime.now().minusHours(1));
+        slot.setCreatedAt(LocalDateTime.now().minusHours(2));
+
+        assertNoOpportunities(List.of(slot));
+    }
+
+    @Test
+    void acceptShouldRejectOpportunityCreatedBeforeInterestActivation() {
+        interest.setCreatedAt(LocalDateTime.now().minusHours(1));
+        slot.setCreatedAt(LocalDateTime.now().minusHours(2));
+        when(availabilityInterestRepository.findByIdForUpdate(INTEREST_ID))
+                .thenReturn(Optional.of(interest));
+        when(availableSlotRepository.findByIdForUpdate(SLOT_ID))
+                .thenReturn(Optional.of(slot));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> availabilityInterestService.accept(
+                        CUSTOMER_ID,
+                        INTEREST_ID,
+                        new AcceptAvailabilityInterestRequest(SLOT_ID)
+                )
+        );
+
+        assertEquals("Vaga de antecipação indisponível.", exception.getMessage());
+        verify(appointmentRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
@@ -289,6 +407,19 @@ class AvailabilityInterestServiceTest {
                         any(),
                         any()
                 );
+    }
+
+    @Test
+    void canceledAppointmentInterestShouldNotReturnOpportunities() {
+        interest.getAppointment().setStatus(AppointmentStatus.CANCELED);
+        when(availabilityInterestRepository.findById(INTEREST_ID))
+                .thenReturn(Optional.of(interest));
+
+        List<AvailabilityOpportunityResponse> opportunities =
+                availabilityInterestService.findOpportunities(CUSTOMER_ID, INTEREST_ID);
+
+        assertTrue(opportunities.isEmpty());
+        verifyNoInteractions(availableSlotRepository);
     }
 
     @Test

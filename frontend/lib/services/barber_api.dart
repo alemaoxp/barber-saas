@@ -7,6 +7,7 @@ import '../models/availability_interest.dart';
 import '../models/booking_service.dart';
 import '../features/admin/daily_agenda/daily_agenda_models.dart';
 import '../features/admin/daily_agenda/models/admin_customer_summary.dart';
+import '../features/admin/dashboard/dashboard_summary.dart';
 import '../features/admin/auth/admin_auth.dart';
 import '../features/admin/more/weekly_schedule_models.dart';
 import '../features/admin/more/schedule_block_models.dart';
@@ -110,6 +111,34 @@ class BarberApi {
     _ensureSuccess(response);
     return DailyAgendaResponse.fromJson(
         jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<DailyAgendaSlot?> nextScheduledAppointment() async {
+    final response = await _adminGet(
+      Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/next-appointment'),
+    );
+    if (response.statusCode == 204) return null;
+    _ensureSuccess(response);
+    return DailyAgendaSlot.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<DashboardSummary> dashboardSummary({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final uri =
+        Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/dashboard/summary')
+            .replace(queryParameters: {
+      'startDate': _dateOnly(startDate),
+      'endDate': _dateOnly(endDate),
+    });
+    final response = await _adminGet(uri);
+    _ensureSuccess(response);
+    return DashboardSummary.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<WeeklyScheduleResponse> weeklySchedule() async {
@@ -284,6 +313,35 @@ class BarberApi {
     );
   }
 
+  Future<AppointmentData> updateAdminAppointment({
+    required String appointmentId,
+    required String customerId,
+    required List<String> serviceIds,
+    required DateTime appointmentDateTime,
+  }) async {
+    final response = await _adminPut(
+      Uri.parse(
+          '$apiBaseUrl/api/v1/barbers/$barberId/appointments/$appointmentId'),
+      body: jsonEncode({
+        'customerId': customerId,
+        'serviceIds': serviceIds,
+        'appointmentDateTime': _isoLocal(appointmentDateTime),
+      }),
+    );
+    _ensureSuccess(response);
+    return AppointmentData.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> deleteAdminAppointment(String appointmentId) async {
+    final response = await _adminDelete(
+      Uri.parse(
+          '$apiBaseUrl/api/v1/barbers/$barberId/appointments/$appointmentId'),
+    );
+    _ensureSuccess(response, expectedStatus: 204);
+  }
+
   Future<void> deleteAdminService(String serviceId) async {
     final response = await _adminDelete(
       Uri.parse('$apiBaseUrl/api/v1/barbers/$barberId/services/$serviceId'),
@@ -303,7 +361,7 @@ class BarberApi {
     _ensureSuccess(response, expectedStatus: 204);
   }
 
-  Future<void> enableTestPush(String customerId) async {
+  Future<void> registerPushSubscription(String customerId) async {
     final keyResponse =
         await _client.get(Uri.parse('$apiBaseUrl/api/dev/push/public-key'));
     _ensureSuccess(keyResponse);
@@ -322,6 +380,12 @@ class BarberApi {
       }),
     );
     _ensureSuccess(response, expectedStatus: 204);
+  }
+
+  Future<AvailabilityInterest> activateAvailabilityInterest(
+      String customerId, String appointmentId) async {
+    await registerPushSubscription(customerId);
+    return createAvailabilityInterest(customerId, appointmentId);
   }
 
   Future<AvailabilityInterest> createAvailabilityInterest(

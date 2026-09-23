@@ -68,15 +68,22 @@ public class PushTestService {
         send(target, TEST_PAYLOAD, "teste");
     }
 
-    public void sendAvailabilityNotification(UUID customerId) {
+    public void sendAvailabilityNotification(
+            UUID customerId,
+            UUID availabilityInterestId,
+            UUID availableSlotId) {
         PushSubscriptionRequest target = subscriptionForCustomer(customerId);
         if (target == null) {
             LOGGER.info("Cliente {} elegível sem subscription local ativa.", customerId);
             return;
         }
-        send(target, """
-                {"title":"Jhow Cortes","body":"Surgiu um horário mais cedo. Toque para conferir."}
-                """, "oportunidade");
+        send(target, availabilityPayload(availabilityInterestId, availableSlotId), "oportunidade");
+    }
+
+    static String availabilityPayload(UUID availabilityInterestId, UUID availableSlotId) {
+        return """
+                {"title":"Jhow Cortes","body":"Surgiu um horário mais cedo. Toque para conferir.","availableSlotId":"%s","availabilityInterestId":"%s"}
+                """.formatted(availableSlotId, availabilityInterestId);
     }
 
     private void send(PushSubscriptionRequest target, String payload, String kind) {

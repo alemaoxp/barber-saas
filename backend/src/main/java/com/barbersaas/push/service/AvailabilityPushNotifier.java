@@ -1,6 +1,7 @@
 package com.barbersaas.push.service;
 
 import com.barbersaas.appointments.event.AvailableSlotCreatedEvent;
+import com.barbersaas.appointments.enums.AppointmentStatus;
 import com.barbersaas.availabilityinterest.entity.AvailabilityInterestEntity;
 import com.barbersaas.availabilityinterest.enums.AvailabilityInterestStatus;
 import com.barbersaas.availabilityinterest.repository.AvailabilityInterestRepository;
@@ -28,12 +29,18 @@ public class AvailabilityPushNotifier {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void notifyEligibleCustomers(AvailableSlotCreatedEvent event) {
         for (AvailabilityInterestEntity interest : interestRepository.findEligibleInterests(
-                AvailabilityInterestStatus.ACTIVE, event.barberId(), event.availableDateTime())) {
+                AvailabilityInterestStatus.ACTIVE,
+                AppointmentStatus.SCHEDULED,
+                event.barberId(),
+                event.availableDateTime())) {
             if (interest.getStatus() != AvailabilityInterestStatus.ACTIVE) {
                 continue;
             }
             try {
-                pushTestService.sendAvailabilityNotification(interest.getCustomer().getId());
+                pushTestService.sendAvailabilityNotification(
+                        interest.getCustomer().getId(),
+                        interest.getId(),
+                        event.availableSlotId());
             } catch (RuntimeException exception) {
                 LOGGER.warn("Não foi possível alertar o cliente {} sobre a vaga {}.",
                         interest.getCustomer().getId(), event.availableDateTime(), exception);

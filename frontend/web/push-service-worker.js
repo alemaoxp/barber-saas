@@ -1,13 +1,23 @@
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
 self.addEventListener('push', (event) => {
   const payload = event.data ? event.data.json() : {};
   event.waitUntil(self.registration.showNotification(payload.title || 'Barber SaaS', {
     body: payload.body || 'Notificação de teste recebida com sucesso.',
+    data: {
+      availableSlotId: payload.availableSlotId,
+      availabilityInterestId: payload.availabilityInterestId,
+    },
   }));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = `${self.location.origin}/?screen=appointments`;
+  const availableSlotId = event.notification.data && event.notification.data.availableSlotId;
+  const availabilityInterestId = event.notification.data && event.notification.data.availabilityInterestId;
+  const targetUrl = `${self.location.origin}/?screen=appointments${availableSlotId ? `&availableSlotId=${encodeURIComponent(availableSlotId)}` : ''}${availabilityInterestId ? `&availabilityInterestId=${encodeURIComponent(availabilityInterestId)}` : ''}`;
   event.waitUntil((async () => {
     try {
       const windows = await clients.matchAll({type: 'window', includeUncontrolled: true});

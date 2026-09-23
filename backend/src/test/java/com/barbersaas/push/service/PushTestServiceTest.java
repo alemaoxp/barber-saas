@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PushTestServiceTest {
 
@@ -75,5 +77,20 @@ class PushTestServiceTest {
         assertEquals(
                 "IOException: transport failed; root cause IllegalStateException: invalid VAPID key pair",
                 PushTestService.diagnosticMessage(exception));
+    }
+
+    @Test
+    void availabilityPayloadIdentifiesTheInterestAndSlot() {
+        UUID firstInterest = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID secondInterest = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        UUID slot = UUID.fromString("00000000-0000-0000-0000-000000000003");
+
+        String firstPayload = PushTestService.availabilityPayload(firstInterest, slot);
+        String secondPayload = PushTestService.availabilityPayload(secondInterest, slot);
+
+        assertTrue(firstPayload.contains("\"availableSlotId\":\"" + slot + "\""));
+        assertTrue(firstPayload.contains("\"availabilityInterestId\":\"" + firstInterest + "\""));
+        assertTrue(secondPayload.contains("\"availabilityInterestId\":\"" + secondInterest + "\""));
+        assertNotEquals(firstPayload, secondPayload);
     }
 }

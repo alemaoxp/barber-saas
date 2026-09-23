@@ -7,6 +7,7 @@ import com.barbersaas.appointments.dto.DailyAgendaCustomerSummary;
 import com.barbersaas.appointments.dto.DailyAgendaResponse;
 import com.barbersaas.appointments.dto.DailyAgendaServiceSummary;
 import com.barbersaas.appointments.dto.DailyAgendaSlotResponse;
+import com.barbersaas.appointments.dto.DashboardSummaryResponse;
 import com.barbersaas.appointments.dto.PublicAppointmentResponse;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
@@ -101,6 +102,39 @@ public class AppointmentService {
                         new NotFoundException(
                                 "Agendamento não encontrado."
                         ));
+    }
+
+    public DashboardSummaryResponse getDashboardSummary(
+            UUID barberId,
+            LocalDate startDate,
+            LocalDate endDate) {
+
+        if (startDate.isAfter(endDate)) {
+            throw new BusinessException("A data inicial não pode ser posterior à data final.");
+        }
+
+        findBarber(barberId);
+        List<AppointmentEntity> appointments = appointmentRepository
+                .findByBarberIdAndAppointmentDateTimeBetween(
+                        barberId,
+                        startDate.atStartOfDay(),
+                        endDate.atTime(LocalTime.MAX)
+                )
+                .stream()
+                .filter(appointment -> appointment.getStatus() != AppointmentStatus.CANCELED)
+                .toList();
+
+        BigDecimal scheduledValue = appointments.stream()
+                .map(AppointmentEntity::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new DashboardSummaryResponse(
+                barberId,
+                startDate,
+                endDate,
+                appointments.size(),
+                scheduledValue
+        );
     }
 
     private void validateAvailability(
@@ -381,6 +415,24 @@ public class AppointmentService {
                 true,
                 slots
         );
+    }
+
+    public Optional<DailyAgendaSlotResponse> findNextScheduledAppointment(
+            UUID barberId,
+            LocalDateTime now) {
+
+        findBarber(barberId);
+
+        return appointmentRepository
+                .findFirstByBarberIdAndStatusAndAppointmentDateTimeAfterOrderByAppointmentDateTimeAsc(
+                        barberId,
+                        AppointmentStatus.SCHEDULED,
+                        now
+                )
+                .map(appointment -> dailyAgendaOccupiedSlot(
+                        appointment.getAppointmentDateTime(),
+                        appointment
+                ));
     }
 
     private DailyAgendaSlotResponse dailyAgendaSlot(
@@ -762,6 +814,7 @@ public class AppointmentService {
         );
     }
 
+    @Transactional
     public void delete(
             UUID barberId,
             UUID appointmentId) {
@@ -775,9 +828,7 @@ public class AppointmentService {
                         barber.getId()
                 );
 
-        appointmentRepository.delete(
-                appointment
-        );
+        cancel(appointment);
     }
 
     public AppointmentResponse updateStatus(
@@ -815,36 +866,24 @@ public class AppointmentService {
                                         "Agendamento não encontrado."
                                 ));
 
-        if (appointment.getStatus()
-                == AppointmentStatus.CANCELED) {
+        cancel(appointment);
+    }
 
-            throw new BusinessException(
-                    "Agendamento já está cancelado."
-            );
+    private void cancel(AppointmentEntity appointment) {
+        if (appointment.getStatus() == AppointmentStatus.CANCELED) {
+            throw new BusinessException("Agendamento já está cancelado.");
         }
 
-        BarberEntity barber =
-                appointment.getBarber();
-
-        LocalDateTime canceledDateTime =
-                appointment.getAppointmentDateTime();
-
-        appointment.setStatus(
-                AppointmentStatus.CANCELED
-        );
-
-        appointmentRepository.save(
-                appointment
-        );
+        BarberEntity barber = appointment.getBarber();
+        LocalDateTime canceledDateTime = appointment.getAppointmentDateTime();
+        appointment.setStatus(AppointmentStatus.CANCELED);
+        appointmentRepository.save(appointment);
 
         AvailableSlotEntity availableSlot = availableSlotService.registerAvailableSlot(
-                barber,
-                canceledDateTime
-        );
-
+                barber, canceledDateTime);
         if (availableSlot.getStatus() == AvailableSlotStatus.AVAILABLE) {
             eventPublisher.publishEvent(new AvailableSlotCreatedEvent(
-                    barber.getId(), canceledDateTime));
+                    barber.getId(), canceledDateTime, availableSlot.getId()));
         }
     }
 }

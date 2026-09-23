@@ -18,7 +18,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,15 +71,20 @@ class AvailableSlotServiceTest {
     }
 
     @Test
-    void registerAvailableSlotShouldNotCreateDuplicate() {
+    void registerAvailableSlotShouldReuseAndRefreshAReleasedSlot() {
         LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
         AvailableSlotEntity existingSlot =
                 new AvailableSlotEntity(barber, dateTime);
+        existingSlot.setStatus(AvailableSlotStatus.BOOKED);
+        LocalDateTime firstRelease = LocalDateTime.now().minusDays(1);
+        existingSlot.setCreatedAt(firstRelease);
 
         when(availableSlotRepository.findByBarberIdAndAvailableDateTime(
                 BARBER_ID,
                 dateTime
         )).thenReturn(Optional.of(existingSlot));
+        when(availableSlotRepository.save(existingSlot))
+                .thenReturn(existingSlot);
 
         AvailableSlotEntity slot =
                 availableSlotService.registerAvailableSlot(
@@ -89,6 +93,9 @@ class AvailableSlotServiceTest {
                 );
 
         assertSame(existingSlot, slot);
-        verify(availableSlotRepository, never()).save(any());
+        assertEquals(AvailableSlotStatus.AVAILABLE, slot.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                slot.getCreatedAt().isAfter(firstRelease));
+        verify(availableSlotRepository).save(existingSlot);
     }
 }

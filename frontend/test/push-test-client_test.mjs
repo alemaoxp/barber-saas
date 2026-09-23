@@ -6,6 +6,7 @@ const source = await readFile(new URL('../web/push_test_client.js', import.meta.
 
 async function subscribe({ existing, unsubscribeResult = true }) {
   const calls = [];
+  let registered;
   const fresh = {
     toJSON: () => ({ endpoint: 'new', keys: { p256dh: 'new-key', auth: 'new-auth' } }),
   };
@@ -27,16 +28,20 @@ async function subscribe({ existing, unsubscribeResult = true }) {
       },
     },
   };
-  const notification = { requestPermission: async () => 'granted' };
+  const notification = { permission: 'default', requestPermission: async () => 'granted' };
   const context = {
     window: { PushManager: function PushManager() {}, Notification: notification },
-    navigator: { serviceWorker: { register: async () => registration } },
+    navigator: { serviceWorker: { register: async (script, options) => {
+      registered = { script, options };
+      return registration;
+    } } },
     Notification: notification,
     atob,
     Uint8Array,
   };
   vm.runInNewContext(source, context);
-  return { calls, run: () => context.window.barberPushTest.subscribe('AQ') };
+  return { calls, registered: () => registered,
+    run: () => context.window.barberPushTest.subscribe('AQ') };
 }
 
 {
@@ -45,6 +50,9 @@ async function subscribe({ existing, unsubscribeResult = true }) {
     endpoint: 'new', keys: { p256dh: 'new-key', auth: 'new-auth' },
   });
   assert.deepEqual(test.calls, ['get', 'unsubscribe', 'subscribe']);
+  assert.equal(test.registered().script, 'push-service-worker.js?v=3');
+  assert.equal(test.registered().options.scope, 'push/');
+  assert.equal(test.registered().options.updateViaCache, 'none');
 }
 
 {
@@ -55,6 +63,42 @@ async function subscribe({ existing, unsubscribeResult = true }) {
 
 {
   const test = await subscribe({ existing: true, unsubscribeResult: false });
-  await assert.rejects(test.run(), /Não foi possível remover a subscription anterior/);
+  await assert.rejects(test.run(), /Não foi possível atualizar a subscription Web Push/);
   assert.deepEqual(test.calls, ['get', 'unsubscribe']);
+}
+
+{
+  let permissionRequests = 0;
+  let subscriptions = 0;
+  const existing = {
+    options: { applicationServerKey: Uint8Array.from([1, 2, 3]) },
+    toJSON: () => ({ endpoint: 'existing', keys: { p256dh: 'key', auth: 'auth' } }),
+  };
+  const notification = {
+    permission: 'granted',
+    requestPermission: async () => {
+      permissionRequests++;
+      return 'granted';
+    },
+  };
+  const context = {
+    window: { PushManager: function PushManager() {}, Notification: notification },
+    navigator: { serviceWorker: { register: async () => ({
+      pushManager: {
+        getSubscription: async () => existing,
+        subscribe: async () => {
+          subscriptions++;
+          return existing;
+        },
+      },
+    }) } },
+    Notification: notification,
+    atob,
+    Uint8Array,
+  };
+  vm.runInNewContext(source, context);
+
+  assert.deepEqual(JSON.parse(await context.window.barberPushTest.subscribe('AQID')), existing.toJSON());
+  assert.equal(permissionRequests, 0);
+  assert.equal(subscriptions, 0);
 }

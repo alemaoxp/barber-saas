@@ -176,6 +176,10 @@ public class AvailabilityInterestService {
         AppointmentEntity appointment =
                 interest.getAppointment();
 
+        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
+            return List.of();
+        }
+
         LocalDateTime now =
                 LocalDateTime.now();
 
@@ -196,6 +200,7 @@ public class AvailabilityInterestService {
                 .stream()
                 .filter(slot ->
                         isEligibleSlot(
+                                interest,
                                 appointment,
                                 slot,
                                 now
@@ -292,6 +297,12 @@ public class AvailabilityInterestService {
                         );
 
         if (slot.getStatus() != AvailableSlotStatus.AVAILABLE) {
+            throw new BusinessException(
+                    "Vaga de antecipação indisponível."
+            );
+        }
+
+        if (!slot.getCreatedAt().isAfter(interest.getCreatedAt())) {
             throw new BusinessException(
                     "Vaga de antecipação indisponível."
             );
@@ -405,6 +416,7 @@ public class AvailabilityInterestService {
     }
 
     private boolean isEligibleSlot(
+            AvailabilityInterestEntity interest,
             AppointmentEntity appointment,
             AvailableSlotEntity slot,
             LocalDateTime now) {
@@ -413,6 +425,7 @@ public class AvailabilityInterestService {
                 slot.getAvailableDateTime();
 
         return slot.getStatus() == AvailableSlotStatus.AVAILABLE
+                && slot.getCreatedAt().isAfter(interest.getCreatedAt())
                 && slot.getBarber().getId()
                 .equals(appointment.getBarber().getId())
                 && slotDateTime.isAfter(now)

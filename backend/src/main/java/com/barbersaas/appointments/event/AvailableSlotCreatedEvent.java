@@ -5,5 +5,6 @@ import java.util.UUID;
 
 public record AvailableSlotCreatedEvent(
         UUID barberId,
-        LocalDateTime availableDateTime) {
+        LocalDateTime availableDateTime,
+        UUID availableSlotId) {
 }

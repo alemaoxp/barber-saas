@@ -36,6 +36,9 @@ class AvailabilityPushNotifierTest {
 
     private static final UUID BARBER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID CUSTOMER_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID INTEREST_A_ID = UUID.fromString("00000000-0000-0000-0000-000000000005");
+    private static final UUID INTEREST_B_ID = UUID.fromString("00000000-0000-0000-0000-000000000006");
+    private static final UUID AVAILABLE_SLOT_ID = UUID.fromString("00000000-0000-0000-0000-000000000004");
     private static final LocalDateTime SLOT_TIME = LocalDateTime.of(2026, 9, 10, 10, 0);
 
     @Mock
@@ -50,13 +53,15 @@ class AvailabilityPushNotifierTest {
         AvailabilityInterestEntity active = interest(AvailabilityInterestStatus.ACTIVE);
         AvailabilityInterestEntity canceled = interest(AvailabilityInterestStatus.CANCELED);
         when(interestRepository.findEligibleInterests(
-                AvailabilityInterestStatus.ACTIVE, BARBER_ID, SLOT_TIME)).thenReturn(List.of(active, canceled));
+                AvailabilityInterestStatus.ACTIVE, AppointmentStatus.SCHEDULED, BARBER_ID, SLOT_TIME))
+                .thenReturn(List.of(active, canceled));
 
-        notifier.notifyEligibleCustomers(new AvailableSlotCreatedEvent(BARBER_ID, SLOT_TIME));
+        notifier.notifyEligibleCustomers(new AvailableSlotCreatedEvent(BARBER_ID, SLOT_TIME, AVAILABLE_SLOT_ID));
 
-        verify(pushTestService).sendAvailabilityNotification(CUSTOMER_ID);
+        verify(pushTestService).sendAvailabilityNotification(
+                CUSTOMER_ID, active.getId(), AVAILABLE_SLOT_ID);
         verify(pushTestService, never()).sendAvailabilityNotification(
-                canceled.getCustomer().getId());
+                canceled.getCustomer().getId(), canceled.getId(), AVAILABLE_SLOT_ID);
         TransactionalEventListener annotation = AvailabilityPushNotifier.class
                 .getMethod("notifyEligibleCustomers", AvailableSlotCreatedEvent.class)
                 .getAnnotation(TransactionalEventListener.class);
@@ -67,15 +72,40 @@ class AvailabilityPushNotifierTest {
     void pushFailureDoesNotPropagateToTheCancellationTransaction() {
         AvailabilityPushNotifier notifier = new AvailabilityPushNotifier(interestRepository, pushTestService);
         when(interestRepository.findEligibleInterests(
-                AvailabilityInterestStatus.ACTIVE, BARBER_ID, SLOT_TIME)).thenReturn(List.of(interest(AvailabilityInterestStatus.ACTIVE)));
+                AvailabilityInterestStatus.ACTIVE, AppointmentStatus.SCHEDULED, BARBER_ID, SLOT_TIME))
+                .thenReturn(List.of(interest(AvailabilityInterestStatus.ACTIVE)));
         doThrow(new BusinessException("push indisponível"))
-                .when(pushTestService).sendAvailabilityNotification(CUSTOMER_ID);
+                .when(pushTestService).sendAvailabilityNotification(
+                        CUSTOMER_ID, INTEREST_A_ID, AVAILABLE_SLOT_ID);
 
         assertDoesNotThrow(() -> notifier.notifyEligibleCustomers(
-                new AvailableSlotCreatedEvent(BARBER_ID, SLOT_TIME)));
+                new AvailableSlotCreatedEvent(BARBER_ID, SLOT_TIME, AVAILABLE_SLOT_ID)));
+    }
+
+    @Test
+    void notifiesTwoActiveInterestsOfTheSameCustomerIndependently() {
+        AvailabilityPushNotifier notifier = new AvailabilityPushNotifier(interestRepository, pushTestService);
+        AvailabilityInterestEntity first = interest(AvailabilityInterestStatus.ACTIVE, INTEREST_A_ID);
+        AvailabilityInterestEntity second = interest(AvailabilityInterestStatus.ACTIVE, INTEREST_B_ID);
+        when(interestRepository.findEligibleInterests(
+                AvailabilityInterestStatus.ACTIVE, AppointmentStatus.SCHEDULED, BARBER_ID, SLOT_TIME))
+                .thenReturn(List.of(first, second));
+
+        notifier.notifyEligibleCustomers(new AvailableSlotCreatedEvent(BARBER_ID, SLOT_TIME, AVAILABLE_SLOT_ID));
+
+        verify(pushTestService).sendAvailabilityNotification(
+                CUSTOMER_ID, INTEREST_A_ID, AVAILABLE_SLOT_ID);
+        verify(pushTestService).sendAvailabilityNotification(
+                CUSTOMER_ID, INTEREST_B_ID, AVAILABLE_SLOT_ID);
     }
 
     private AvailabilityInterestEntity interest(AvailabilityInterestStatus status) {
+        return interest(status, status == AvailabilityInterestStatus.ACTIVE
+                ? INTEREST_A_ID : UUID.fromString("00000000-0000-0000-0000-000000000003"));
+    }
+
+    private AvailabilityInterestEntity interest(
+            AvailabilityInterestStatus status, UUID interestId) {
         CustomerEntity customer = new CustomerEntity("Cliente", "(11) 98888-8888", "cliente@example.com", null, null, true);
         ReflectionTestUtils.setField(customer, "id", status == AvailabilityInterestStatus.CANCELED
                 ? UUID.fromString("00000000-0000-0000-0000-000000000003") : CUSTOMER_ID);
@@ -85,6 +115,7 @@ class AvailabilityPushNotifierTest {
                 List.of(new ServiceEntity("Corte", "", 30, BigDecimal.TEN, true)), BigDecimal.TEN,
                 SLOT_TIME.plusDays(1), AppointmentStatus.SCHEDULED, "");
         AvailabilityInterestEntity interest = new AvailabilityInterestEntity(customer, appointment);
+        interest.setId(interestId);
         interest.setStatus(status);
         return interest;
     }

@@ -58,6 +58,11 @@ public class AvailableSlotService {
                         barber.getId(),
                         availableDateTime
                 )
+                .map(slot -> {
+                    slot.setStatus(AvailableSlotStatus.AVAILABLE);
+                    slot.setCreatedAt(LocalDateTime.now());
+                    return availableSlotRepository.save(slot);
+                })
                 .orElseGet(() ->
                         availableSlotRepository.save(
                                 new AvailableSlotEntity(

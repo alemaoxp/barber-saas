@@ -1,6 +1,7 @@
 package com.barbersaas.appointments.repository;
 
 import com.barbersaas.appointments.entity.AppointmentEntity;
+import com.barbersaas.appointments.enums.AppointmentStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -31,6 +32,13 @@ public interface AppointmentRepository extends JpaRepository<AppointmentEntity, 
             UUID barberId,
             LocalDateTime start,
             LocalDateTime end
+    );
+
+    Optional<AppointmentEntity>
+    findFirstByBarberIdAndStatusAndAppointmentDateTimeAfterOrderByAppointmentDateTimeAsc(
+            UUID barberId,
+            AppointmentStatus status,
+            LocalDateTime appointmentDateTime
     );
 
     Optional<AppointmentEntity> findByCancelToken(

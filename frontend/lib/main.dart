@@ -22,7 +22,11 @@ class BarberSaasApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       home: switch (Uri.base.queryParameters['screen'] ??
           const String.fromEnvironment('START_SCREEN')) {
-        'appointments' => const AppointmentsPage(),
+        'appointments' => AppointmentsPage(
+            selectedAvailableSlotId:
+                Uri.base.queryParameters['availableSlotId'],
+            selectedAvailabilityInterestId:
+                Uri.base.queryParameters['availabilityInterestId']),
         'admin' => AdminGate(),
         _ => SplashPage(
             onFinished: () {

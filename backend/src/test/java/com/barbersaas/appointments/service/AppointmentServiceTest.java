@@ -2,7 +2,9 @@ package com.barbersaas.appointments.service;
 
 import com.barbersaas.appointments.dto.CreateAppointmentRequest;
 import com.barbersaas.appointments.dto.DailyAgendaResponse;
+import com.barbersaas.appointments.dto.DailyAgendaSlotResponse;
 import com.barbersaas.appointments.dto.DailyAgendaSlotStatus;
+import com.barbersaas.appointments.dto.DashboardSummaryResponse;
 import com.barbersaas.appointments.dto.UpdateAppointmentRequest;
 import com.barbersaas.appointments.entity.AppointmentEntity;
 import com.barbersaas.appointments.enums.AppointmentStatus;
@@ -68,6 +70,8 @@ class AppointmentServiceTest {
             UUID.fromString("00000000-0000-0000-0000-000000000005");
     private static final UUID APPOINTMENT_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000004");
+    private static final UUID AVAILABLE_SLOT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000006");
 
     @Mock
     private AppointmentRepository appointmentRepository;
@@ -357,9 +361,11 @@ class AppointmentServiceTest {
         when(appointmentRepository.findByCancelToken(
                 APPOINTMENT_ID.toString()
         )).thenReturn(Optional.of(appointment));
+        com.barbersaas.availableslot.entity.AvailableSlotEntity availableSlot =
+                new com.barbersaas.availableslot.entity.AvailableSlotEntity(barber, dateTime);
+        ReflectionTestUtils.setField(availableSlot, "id", AVAILABLE_SLOT_ID);
         when(availableSlotService.registerAvailableSlot(barber, dateTime))
-                .thenReturn(new com.barbersaas.availableslot.entity.AvailableSlotEntity(
-                        barber, dateTime));
+                .thenReturn(availableSlot);
 
         appointmentService.cancelByToken(APPOINTMENT_ID);
 
@@ -372,9 +378,34 @@ class AppointmentServiceTest {
         );
         verify(eventPublisher).publishEvent(
                 new com.barbersaas.appointments.event.AvailableSlotCreatedEvent(
-                        barber.getId(), dateTime
+                        barber.getId(), dateTime, AVAILABLE_SLOT_ID
                 )
         );
+    }
+
+    @Test
+    void adminCancelScheduledAppointmentShouldUseTheSameAvailableSlotFlow() {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
+        AppointmentEntity appointment = existingAppointment(
+                dateTime, 40, AppointmentStatus.SCHEDULED);
+
+        when(appointmentRepository.findByIdAndBarberId(APPOINTMENT_ID, BARBER_ID))
+                .thenReturn(Optional.of(appointment));
+        com.barbersaas.availableslot.entity.AvailableSlotEntity availableSlot =
+                new com.barbersaas.availableslot.entity.AvailableSlotEntity(barber, dateTime);
+        ReflectionTestUtils.setField(availableSlot, "id", AVAILABLE_SLOT_ID);
+        when(availableSlotService.registerAvailableSlot(barber, dateTime))
+                .thenReturn(availableSlot);
+
+        appointmentService.delete(BARBER_ID, APPOINTMENT_ID);
+
+        assertEquals(AppointmentStatus.CANCELED, appointment.getStatus());
+        verify(appointmentRepository).save(appointment);
+        verify(appointmentRepository, never()).delete(appointment);
+        verify(availableSlotService).registerAvailableSlot(barber, dateTime);
+        verify(eventPublisher).publishEvent(
+                new com.barbersaas.appointments.event.AvailableSlotCreatedEvent(
+                        BARBER_ID, dateTime, AVAILABLE_SLOT_ID));
     }
 
     @Test
@@ -662,7 +693,14 @@ class AppointmentServiceTest {
     @Test
     void dailyAgendaShouldNotOccupyCanceledAppointmentSlot() {
         LocalDate wednesday = LocalDate.of(2026, 9, 2);
-        AppointmentEntity appointment =
+        AppointmentEntity scheduled =
+                existingAppointment(
+                        wednesday.atTime(9, 30),
+                        AppointmentStatus.SCHEDULED,
+                        List.of(service40Minutes),
+                        BigDecimal.valueOf(50)
+                );
+        AppointmentEntity canceled =
                 existingAppointment(
                         wednesday.atTime(10, 0),
                         AppointmentStatus.CANCELED,
@@ -675,13 +713,14 @@ class AppointmentServiceTest {
                 eq(BARBER_ID),
                 eq(wednesday.atStartOfDay()),
                 eq(wednesday.atTime(LocalTime.MAX))
-        )).thenReturn(List.of(appointment));
+        )).thenReturn(List.of(scheduled, canceled));
         when(scheduleBlockService.findBlocksByDate(BARBER_ID, wednesday))
                 .thenReturn(List.of());
 
         DailyAgendaResponse response =
                 appointmentService.getDailyAgenda(BARBER_ID, wednesday);
 
+        assertEquals(DailyAgendaSlotStatus.OCCUPIED, response.getSlots().get(0).getStatus());
         assertEquals(DailyAgendaSlotStatus.FREE, response.getSlots().get(1).getStatus());
         assertNull(response.getSlots().get(1).getAppointmentId());
     }
@@ -819,6 +858,81 @@ class AppointmentServiceTest {
         assertEquals(List.of(), response.getSlots());
         verify(appointmentRepository, never())
                 .findByBarberIdAndAppointmentDateTimeBetween(any(), any(), any());
+    }
+
+    @Test
+    void dashboardSummaryShouldIncludeEveryNonCanceledStatusAndBothDateBounds() {
+        LocalDate startDate = LocalDate.of(2026, 9, 1);
+        LocalDate endDate = LocalDate.of(2026, 9, 2);
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                BARBER_ID, startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)))
+                .thenReturn(List.of(
+                        existingAppointment(startDate.atTime(9, 0), AppointmentStatus.SCHEDULED, List.of(service40Minutes), BigDecimal.valueOf(40)),
+                        existingAppointment(startDate.atTime(10, 0), AppointmentStatus.COMPLETED, List.of(service40Minutes), BigDecimal.valueOf(50)),
+                        existingAppointment(endDate.atTime(23, 59), AppointmentStatus.NO_SHOW, List.of(service40Minutes), BigDecimal.valueOf(60)),
+                        existingAppointment(endDate.atTime(12, 0), AppointmentStatus.CANCELED, List.of(service40Minutes), BigDecimal.valueOf(70))
+                ));
+
+        DashboardSummaryResponse response = appointmentService.getDashboardSummary(BARBER_ID, startDate, endDate);
+
+        assertEquals(3, response.getAppointmentCount());
+        assertEquals(BigDecimal.valueOf(150), response.getScheduledValue());
+    }
+
+    @Test
+    void dashboardSummaryShouldRejectInvertedPeriod() {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> appointmentService.getDashboardSummary(
+                        BARBER_ID, LocalDate.of(2026, 9, 2), LocalDate.of(2026, 9, 1)));
+
+        assertEquals("A data inicial não pode ser posterior à data final.", error.getMessage());
+    }
+
+    @Test
+    void nextScheduledAppointmentShouldReturnTheFirstFutureAppointment() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 21, 18, 0);
+        LocalDateTime wednesday = LocalDateTime.of(2026, 9, 23, 10, 30);
+        AppointmentEntity appointment = existingAppointment(
+                wednesday,
+                AppointmentStatus.SCHEDULED,
+                List.of(service40Minutes),
+                BigDecimal.valueOf(40)
+        );
+        ReflectionTestUtils.setField(appointment, "id", APPOINTMENT_ID);
+
+        when(appointmentRepository
+                .findFirstByBarberIdAndStatusAndAppointmentDateTimeAfterOrderByAppointmentDateTimeAsc(
+                        BARBER_ID,
+                        AppointmentStatus.SCHEDULED,
+                        now
+                ))
+                .thenReturn(Optional.of(appointment));
+
+        Optional<DailyAgendaSlotResponse> response = appointmentService
+                .findNextScheduledAppointment(BARBER_ID, now);
+
+        assertTrue(response.isPresent());
+        assertEquals(wednesday, response.get().getDateTime());
+        assertEquals(APPOINTMENT_ID, response.get().getAppointmentId());
+        assertEquals("Cliente", response.get().getCustomer().getName());
+        assertEquals(BigDecimal.valueOf(40), response.get().getTotalPrice());
+        verifyNoMoreInteractions(weeklyScheduleService);
+    }
+
+    @Test
+    void nextScheduledAppointmentShouldBeEmptyWhenThereIsNoFutureAppointment() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 21, 18, 0);
+        when(appointmentRepository
+                .findFirstByBarberIdAndStatusAndAppointmentDateTimeAfterOrderByAppointmentDateTimeAsc(
+                        BARBER_ID,
+                        AppointmentStatus.SCHEDULED,
+                        now
+                ))
+                .thenReturn(Optional.empty());
+
+        assertTrue(appointmentService
+                .findNextScheduledAppointment(BARBER_ID, now)
+                .isEmpty());
     }
 
     private void assertCreateAllowed(LocalDateTime dateTime) {

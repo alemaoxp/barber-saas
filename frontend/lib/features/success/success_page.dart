@@ -2,18 +2,38 @@ import 'dart:ui';
 
 import '../appointments/appointments_page.dart';
 import '../../models/appointment_data.dart';
+import '../../services/barber_api.dart';
 
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-class SuccessPage extends StatelessWidget {
+class SuccessPage extends StatefulWidget {
   final AppointmentData appointment;
+  final BarberApi? api;
 
   const SuccessPage({
     super.key,
     required this.appointment,
+    this.api,
   });
+
+  @override
+  State<SuccessPage> createState() => _SuccessPageState();
+}
+
+class _SuccessPageState extends State<SuccessPage> {
+  late final BarberApi _api;
+  bool _activatingAvailability = false;
+  bool _availabilityActivated = false;
+
+  AppointmentData get appointment => widget.appointment;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = widget.api ?? BarberApi();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,9 +79,12 @@ class SuccessPage extends StatelessWidget {
                         ),
 
                         Expanded(
-                          child: Column(
+                          child: SingleChildScrollView(
+                            child: Column(
                             children: [
                               _buildAppointmentCard(),
+                              const SizedBox(height: 10),
+                              _buildAvailabilityCard(),
 
                               if (appointment
                                   .whatsappNotifications) ...[
@@ -72,6 +95,7 @@ class SuccessPage extends StatelessWidget {
                                 _buildWhatsAppCard(),
                               ],
                             ],
+                            ),
                           ),
                         ),
                       ],
@@ -86,6 +110,69 @@ class SuccessPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildAvailabilityCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.055),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_active_outlined,
+              color: Color(0xFF39FF68)),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Quer antecipar seu horário?\nAvise-me se surgir um horário mais cedo.',
+              style: TextStyle(color: Colors.white, height: 1.3),
+            ),
+          ),
+          TextButton(
+            onPressed: _activatingAvailability || _availabilityActivated
+                ? null
+                : _activateAvailability,
+            child: Text(_availabilityActivated
+                ? 'ATIVADO'
+                : _activatingAvailability
+                    ? 'ATIVANDO...'
+                    : 'AVISAR'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _activateAvailability() async {
+    final customerId = appointment.customerId;
+    final appointmentId = appointment.id;
+    if (customerId == null || appointmentId == null) return;
+    setState(() => _activatingAvailability = true);
+    try {
+      await _api.activateAvailabilityInterest(customerId, appointmentId);
+      if (!mounted) return;
+      setState(() => _availabilityActivated = true);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Avisaremos se surgir um horário antes.'),
+      ));
+    } on BarberApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Não foi possível ativar os avisos.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _activatingAvailability = false);
+    }
   }
 
   // ===========================================================================

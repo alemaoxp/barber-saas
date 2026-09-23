@@ -37,7 +37,7 @@ public class AvailableSlotEntity {
     @Column(nullable = false)
     private AvailableSlotStatus status;
 
-    @Column(nullable = false, updatable = false)
+    @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public AvailableSlotEntity() {

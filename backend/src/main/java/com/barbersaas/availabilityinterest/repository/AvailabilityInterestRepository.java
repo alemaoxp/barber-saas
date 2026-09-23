@@ -1,5 +1,6 @@
 package com.barbersaas.availabilityinterest.repository;
 
+import com.barbersaas.appointments.enums.AppointmentStatus;
 import com.barbersaas.availabilityinterest.entity.AvailabilityInterestEntity;
 import com.barbersaas.availabilityinterest.enums.AvailabilityInterestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,11 +45,13 @@ public interface AvailabilityInterestRepository
             SELECT ai
             FROM AvailabilityInterestEntity ai
             WHERE ai.status = :status
+            AND ai.appointment.status = :appointmentStatus
             AND ai.appointment.barber.id = :barberId
             AND ai.appointment.appointmentDateTime > :availableDateTime
             """)
     List<AvailabilityInterestEntity> findEligibleInterests(
             @Param("status") AvailabilityInterestStatus status,
+            @Param("appointmentStatus") AppointmentStatus appointmentStatus,
             @Param("barberId") UUID barberId,
             @Param("availableDateTime") LocalDateTime availableDateTime
     );

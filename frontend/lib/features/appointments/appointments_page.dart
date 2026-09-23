@@ -6,14 +6,19 @@ import 'package:barber_saas_mobile/widgets/appointment_cancelled_dialog.dart';
 import '../../models/appointment_data.dart';
 import '../../models/availability_interest.dart';
 import '../../services/barber_api.dart';
+import '../home/home_page.dart';
 
 class AppointmentsPage extends StatefulWidget {
   const AppointmentsPage({
     super.key,
     this.api,
+    this.selectedAvailableSlotId,
+    this.selectedAvailabilityInterestId,
   });
 
   final BarberApi? api;
+  final String? selectedAvailableSlotId;
+  final String? selectedAvailabilityInterestId;
 
   @override
   State<AppointmentsPage> createState() => _AppointmentsPageState();
@@ -29,7 +34,7 @@ class _AppointmentsPageState extends State<AppointmentsPage>
   Map<String, List<AvailabilityOpportunity>> _opportunities = const {};
   bool _loading = true;
   String? _error;
-  bool _enablingTestPush = false;
+  bool _selectedOpportunityHandled = false;
 
   @override
   void initState() {
@@ -105,6 +110,7 @@ class _AppointmentsPageState extends State<AppointmentsPage>
             for (final entry in opportunityEntries) entry.key: entry.value
           };
         });
+        _showSelectedOpportunity();
       }
     } on BarberApiException catch (error) {
       if (mounted) {
@@ -119,6 +125,49 @@ class _AppointmentsPageState extends State<AppointmentsPage>
         setState(() => _loading = false);
       }
     }
+  }
+
+  void _showSelectedOpportunity() {
+    if (_selectedOpportunityHandled || widget.selectedAvailableSlotId == null) {
+      return;
+    }
+    _selectedOpportunityHandled = true;
+    AvailabilityInterest? selectedInterest;
+    AvailabilityOpportunity? selectedOpportunity;
+    AppointmentData? currentAppointment;
+    var matchingOpportunities = 0;
+    for (final entry in _opportunities.entries) {
+      final interest = _activeInterests[entry.key];
+      if (widget.selectedAvailabilityInterestId != null &&
+          interest?.id != widget.selectedAvailabilityInterestId) {
+        continue;
+      }
+      for (final opportunity in entry.value) {
+        if (opportunity.availableSlotId == widget.selectedAvailableSlotId) {
+          matchingOpportunities++;
+          selectedInterest = interest;
+          currentAppointment = _appointments
+              .where((appointment) => appointment.id == entry.key)
+              .firstOrNull;
+          selectedOpportunity = opportunity;
+          break;
+        }
+      }
+    }
+    if (matchingOpportunities != 1 ||
+        selectedInterest == null ||
+        selectedOpportunity == null ||
+        currentAppointment == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Esta vaga já não está disponível.')));
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _confirmOpportunity(
+            selectedInterest!, selectedOpportunity!, currentAppointment!);
+      }
+    });
   }
 
   @override
@@ -175,9 +224,14 @@ class _AppointmentsPageState extends State<AppointmentsPage>
             height: 66,
             child: IconButton(
               onPressed: () {
-                Navigator.of(context).popUntil(
-                  (route) => route.isFirst,
-                );
+                final navigator = Navigator.of(context);
+                if (ModalRoute.of(context)?.isFirst ?? true) {
+                  navigator.pushReplacement(
+                    MaterialPageRoute(builder: (_) => HomePage()),
+                  );
+                } else {
+                  navigator.pop();
+                }
               },
               icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -276,71 +330,23 @@ class _AppointmentsPageState extends State<AppointmentsPage>
         30,
       ),
       physics: const BouncingScrollPhysics(),
-      itemCount: appointments.length + 1,
+      itemCount: appointments.length,
       itemBuilder: (
         context,
         index,
       ) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: OutlinedButton.icon(
-              onPressed: _enablingTestPush ? null : _enableTestPush,
-              icon: const Icon(Icons.notifications_outlined),
-              label: Text(_enablingTestPush
-                  ? 'ATIVANDO NOTIFICAÇÃO...'
-                  : 'ATIVAR NOTIFICAÇÃO DE TESTE'),
-            ),
-          );
-        }
         return Padding(
           padding: const EdgeInsets.only(
             bottom: 14,
           ),
           child: _buildAppointmentCard(
-            appointments[index - 1],
-            interest: _activeInterests[appointments[index - 1].id],
-            opportunities:
-                _opportunities[appointments[index - 1].id] ?? const [],
+            appointments[index],
+            interest: _activeInterests[appointments[index].id],
+            opportunities: _opportunities[appointments[index].id] ?? const [],
           ),
         );
       },
     );
-  }
-
-  Future<void> _enableTestPush() async {
-    setState(() => _enablingTestPush = true);
-    try {
-      final customerId = _notificationCustomerId();
-      if (customerId == null) {
-        throw StateError('Cliente do agendamento atual não encontrado.');
-      }
-      await _api.enableTestPush(customerId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notificação de teste ativada.')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Não foi possível ativar a notificação de teste.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _enablingTestPush = false);
-    }
-  }
-
-  String? _notificationCustomerId() {
-    for (final appointment in _appointments) {
-      if (appointment.isUpcomingAt(DateTime.now()) &&
-          appointment.customerId != null) {
-        return appointment.customerId;
-      }
-    }
-    return null;
   }
 
   // ============================================================
@@ -553,12 +559,19 @@ class _AppointmentsPageState extends State<AppointmentsPage>
                   style: TextStyle(
                       color: Color(0xFF39FF68), fontWeight: FontWeight.w600)),
             ),
-            ...opportunities.map((opportunity) => Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () => _acceptOpportunity(interest, opportunity),
-                    child: Text(
-                        'ACEITAR ${_formatOpportunity(opportunity.availableDateTime)}'),
+            ...opportunities.map((opportunity) => Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF39FF68),
+                          foregroundColor: const Color(0xFF03070A)),
+                      onPressed: () => _confirmOpportunity(
+                          interest, opportunity, appointment),
+                      child: Text(
+                          'VER VAGA ${_formatOpportunity(opportunity.availableDateTime)}'),
+                    ),
                   ),
                 )),
           ],
@@ -731,7 +744,7 @@ class _AppointmentsPageState extends State<AppointmentsPage>
   ) async {
     try {
       if (interest == null) {
-        await _api.createAvailabilityInterest(
+        await _api.activateAvailabilityInterest(
             appointment.customerId!, appointment.id!);
       } else {
         await _api.cancelAvailabilityInterest(interest.customerId, interest.id);
@@ -755,6 +768,51 @@ class _AppointmentsPageState extends State<AppointmentsPage>
             content: Text('Não foi possível atualizar a antecipação.')));
       }
     }
+  }
+
+  Future<void> _confirmOpportunity(
+    AvailabilityInterest interest,
+    AvailabilityOpportunity opportunity,
+    AppointmentData appointment,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF10171C),
+        title: const Text('Vaga anterior disponível',
+            style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                'Novo horário\n${_formatOpportunity(opportunity.availableDateTime)}',
+                style: const TextStyle(
+                    color: Color(0xFF39FF68), fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Text(
+                'Seu horário atual\n${_formatOpportunity(appointment.appointmentDateTime!)}',
+                style: const TextStyle(color: Colors.white)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('MANTER MEU HORÁRIO ATUAL'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF39FF68),
+                foregroundColor: const Color(0xFF03070A)),
+            onPressed: () async {
+              await _acceptOpportunity(interest, opportunity);
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            },
+            child: const Text('ACEITAR NOVO HORÁRIO'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _acceptOpportunity(

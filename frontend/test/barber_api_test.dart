@@ -8,6 +8,34 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('dashboardSummary usa o intervalo solicitado e converte a resposta', () async {
+    late http.Request request;
+    final api = BarberApi(
+      client: MockClient((incoming) async {
+        request = incoming;
+        return http.Response(jsonEncode({
+          'barberId': barberId,
+          'startDate': '2026-09-01',
+          'endDate': '2026-09-30',
+          'appointmentCount': 3,
+          'scheduledValue': 150,
+        }), 200);
+      }),
+    );
+
+    final summary = await api.dashboardSummary(
+      startDate: DateTime(2026, 9, 1),
+      endDate: DateTime(2026, 9, 30),
+    );
+
+    expect(request.url.path, '/api/v1/barbers/$barberId/dashboard/summary');
+    expect(request.url.queryParameters, {'startDate': '2026-09-01', 'endDate': '2026-09-30'});
+    expect(summary.barberId, barberId);
+    expect(summary.startDate, '2026-09-01');
+    expect(summary.endDate, '2026-09-30');
+    expect(summary.appointmentCount, 3);
+    expect(summary.scheduledValue, 150);
+  });
   test('envia o customerId carregado junto da subscription Web Push', () async {
     var calls = 0;
     final api = BarberApi(
@@ -35,8 +63,41 @@ void main() {
       },
     );
 
-    await api.enableTestPush('4817ecd7-1341-4830-a7e5-b351d4da3fe0');
+    await api.registerPushSubscription('4817ecd7-1341-4830-a7e5-b351d4da3fe0');
     expect(calls, 2);
+  });
+
+  test('registra o Web Push antes de criar o interesse de antecipação', () async {
+    final paths = <String>[];
+    final api = BarberApi(
+      client: MockClient((request) async {
+        paths.add(request.url.path);
+        if (request.method == 'GET') {
+          return http.Response(jsonEncode({'publicKey': 'vapid-public-key'}), 200);
+        }
+        if (request.url.path == '/api/dev/push/subscription') {
+          return http.Response('', 204);
+        }
+        return http.Response(jsonEncode({
+          'id': 'interest-1',
+          'customerId': 'customer-1',
+          'appointmentId': 'appointment-1',
+          'status': 'ACTIVE',
+        }), 201);
+      }),
+      createPushSubscription: (_) async => {
+        'endpoint': 'https://push.example.test/subscription',
+        'keys': {'p256dh': 'p256dh-key', 'auth': 'auth-key'},
+      },
+    );
+
+    await api.activateAvailabilityInterest('customer-1', 'appointment-1');
+
+    expect(paths, [
+      '/api/dev/push/public-key',
+      '/api/dev/push/subscription',
+      '/api/v1/customers/customer-1/availability-interests',
+    ]);
   });
 
   test('cria o agendamento com IDs e horário ISO reais', () async {
