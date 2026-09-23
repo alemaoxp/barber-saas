@@ -42,6 +42,7 @@ backend/.vscode/
 graphify-out/
 frontend/macos/DerivedData/
 frontend/.ai/
+frontend/devtools_options.yaml
 backend/docs/codex-last-report.md
 backend/.env
 backend/.env.local
