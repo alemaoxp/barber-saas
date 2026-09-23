@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/barber_api.dart';
-import '../home/admin_home_page.dart';
+import '../admin_navigation.dart';
 import 'admin_auth.dart';
 import 'admin_login_page.dart';
 
@@ -71,7 +71,7 @@ class _AdminGateState extends State<AdminGate> {
           );
         }
         if (snapshot.data == _AdminSessionState.signedIn) {
-          return AdminHomePage(api: _api());
+          return AdminShell(api: _api());
         }
         if (snapshot.data == _AdminSessionState.error) {
           return Scaffold(

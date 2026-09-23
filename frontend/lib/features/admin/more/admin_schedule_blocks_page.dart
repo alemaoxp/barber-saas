@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../services/barber_api.dart';
 import 'schedule_block_models.dart';
@@ -225,6 +226,7 @@ class _NewBlockBottomSheetState extends State<_NewBlockBottomSheet> {
         endDateTime: endDateTime,
         reason: _reasonController.text.trim(),
       );
+      HapticFeedback.lightImpact();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

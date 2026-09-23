@@ -93,6 +93,8 @@ void main() {
 
     await tester.tap(find.text('Gabriel Silva'));
     await tester.pumpAndSettle();
+    expect(find.text('Editar agendamento'), findsOneWidget);
+    expect(find.text('Cancelar agendamento'), findsOneWidget);
     expect(find.text('Concluir atendimento'), findsNothing);
     expect(find.text('Marcar como não compareceu'), findsOneWidget);
 
@@ -142,6 +144,96 @@ void main() {
       find.widgetWithText(ElevatedButton, 'Continuar'),
     );
     expect(button.onPressed, isNull);
+  });
+
+  testWidgets('edita agendamento pelo detalhe', (tester) async {
+    String? updatePath;
+    late Map<String, dynamic> payload;
+    final api = BarberApi(
+      client: MockClient((request) async {
+        if (request.method == 'PUT') {
+          updatePath = request.url.path;
+          payload = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(jsonEncode(_noShowAppointmentJson), 200);
+        }
+        return http.Response(jsonEncode(_agendaJson), 200);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DailyAgendaPage(api: api, initialDate: DateTime(2026, 9, 9)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gabriel Silva'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar agendamento'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(NewAppointmentBottomSheet),
+        matching: find.text('Editar agendamento'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(NewAppointmentBottomSheet),
+        matching: find.text('Gabriel Silva'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(NewAppointmentBottomSheet),
+        matching: find.text('Corte + Barba'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Salvar alterações'));
+    await tester.pumpAndSettle();
+
+    expect(updatePath, '/api/v1/barbers/$barberId/appointments/appointment-1');
+    expect(payload, {
+      'customerId': 'customer-1',
+      'serviceIds': ['service-1', 'service-2'],
+      'appointmentDateTime': '2026-09-09T10:00:00',
+    });
+    expect(find.text('Editar agendamento'), findsNothing);
+  });
+
+  testWidgets('cancela agendamento pelo detalhe após confirmação',
+      (tester) async {
+    String? deletePath;
+    final api = BarberApi(
+      client: MockClient((request) async {
+        if (request.method == 'DELETE') {
+          deletePath = request.url.path;
+          return http.Response('', 204);
+        }
+        return http.Response(jsonEncode(_agendaJson), 200);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DailyAgendaPage(api: api, initialDate: DateTime(2026, 9, 9)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gabriel Silva'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar agendamento'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancelar agendamento?'), findsOneWidget);
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, 'Cancelar agendamento'));
+    await tester.pumpAndSettle();
+
+    expect(deletePath, '/api/v1/barbers/$barberId/appointments/appointment-1');
+    expect(find.text('Cancelar agendamento?'), findsNothing);
   });
 
   testWidgets('tocar Selecionar cliente abre seleção e mostra loading', (

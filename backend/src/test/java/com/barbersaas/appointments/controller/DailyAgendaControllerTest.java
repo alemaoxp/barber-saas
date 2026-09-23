@@ -17,12 +17,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,5 +75,18 @@ class DailyAgendaControllerTest {
                 .andExpect(jsonPath("$.workingDay", is(true)))
                 .andExpect(jsonPath("$.slots[0].dateTime", is("2026-09-02T09:30:00")))
                 .andExpect(jsonPath("$.slots[0].status", is("FREE")));
+    }
+
+    @Test
+    void getNextAppointmentShouldReturnNoContentWhenThereIsNoFutureScheduledAppointment()
+            throws Exception {
+        when(appointmentService.findNextScheduledAppointment(
+                org.mockito.ArgumentMatchers.eq(BARBER_ID),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
+        )).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/barbers/{barberId}/next-appointment", BARBER_ID))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Cache-Control", "no-store"));
     }
 }

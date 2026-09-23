@@ -6,11 +6,10 @@ import '../auth/admin_auth.dart';
 import '../auth/admin_login_page.dart';
 import '../services/admin_services_page.dart';
 import 'admin_schedule_blocks_page.dart';
-import 'admin_settings_page.dart';
 import 'admin_working_hours_page.dart';
 
 class AdminMorePage extends StatelessWidget {
-  const AdminMorePage({super.key, this.api});
+  const AdminMorePage({super.key, this.api, this.embedded = false});
 
   static const _primary = Color(0xFF0D2742);
   static const _background = Color(0xFFF6F8FA);
@@ -18,102 +17,99 @@ class AdminMorePage extends StatelessWidget {
   static const _line = Color(0xFFE3E8EE);
 
   final BarberApi? api;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final resolvedApi = api ?? BarberApi();
+    final content = SafeArea(
+      child: Column(
+        children: [
+          AppBar(
+            backgroundColor: Colors.white,
+            foregroundColor: _primary,
+            elevation: 0,
+            title: const Text('Mais'),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+              children: [
+                _MoreTile(
+                  icon: Icons.schedule_rounded,
+                  title: 'Horários de funcionamento',
+                  subtitle: 'Expediente semanal e intervalo',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AdminWorkingHoursPage(api: resolvedApi),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                _MoreTile(
+                  icon: Icons.content_cut_rounded,
+                  title: 'Serviços',
+                  subtitle: 'Serviços e preços',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AdminServicesPage(
+                          api: resolvedApi,
+                          showBackToMore: true,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                _MoreTile(
+                  icon: Icons.event_busy_rounded,
+                  title: 'Bloqueios da agenda',
+                  subtitle: 'Folgas, férias e indisponibilidades',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            AdminScheduleBlocksPage(api: resolvedApi),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                _MoreTile(
+                  icon: Icons.logout_rounded,
+                  title: 'Sair',
+                  onTap: () async {
+                    final store = AdminAuthStore();
+                    try {
+                      await resolvedApi.logoutAdmin();
+                    } catch (_) {
+                      // Sessao expirada: limpar localmente mesmo assim.
+                    }
+                    await store.clear();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AdminLoginPage(store: store),
+                      ),
+                      (_) => false,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (embedded) return content;
     return Scaffold(
       backgroundColor: _background,
       bottomNavigationBar:
           AdminNavigation(activeTab: AdminTab.more, api: resolvedApi),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: _primary,
-        elevation: 0,
-        title: const Text('Mais'),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
-          children: [
-            _MoreTile(
-              icon: Icons.schedule_rounded,
-              title: 'Horários de funcionamento',
-              subtitle: 'Expediente semanal e intervalo',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AdminWorkingHoursPage(api: resolvedApi),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            _MoreTile(
-              icon: Icons.content_cut_rounded,
-              title: 'Serviços',
-              subtitle: 'Serviços e preços',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AdminServicesPage(
-                      api: resolvedApi,
-                      showBackToMore: true,
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            _MoreTile(
-              icon: Icons.event_busy_rounded,
-              title: 'Bloqueios da agenda',
-              subtitle: 'Folgas, férias e indisponibilidades',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AdminScheduleBlocksPage(api: resolvedApi),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            _MoreTile(
-              icon: Icons.settings_outlined,
-              title: 'Configurações',
-              subtitle: 'Preferências do Admin',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const AdminSettingsPage(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            _MoreTile(
-              icon: Icons.logout_rounded,
-              title: 'Sair',
-              onTap: () async {
-                final store = AdminAuthStore();
-                try {
-                  await resolvedApi.logoutAdmin();
-                } catch (_) {
-                  // Sessao expirada: limpar localmente mesmo assim.
-                }
-                await store.clear();
-                if (!context.mounted) return;
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AdminLoginPage(store: store),
-                  ),
-                  (_) => false,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+      body: content,
     );
   }
 }

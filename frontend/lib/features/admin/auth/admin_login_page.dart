@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/barber_api.dart';
-import '../home/admin_home_page.dart';
+import '../admin_navigation.dart';
 import 'admin_auth.dart';
 
 class AdminLoginPage extends StatefulWidget {
@@ -51,7 +51,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) =>
-              AdminHomePage(api: widget.api ?? adminApi(widget.store, null)),
+              AdminShell(api: widget.api ?? adminApi(widget.store, null)),
         ),
       );
     } catch (error) {

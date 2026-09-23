@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../services/barber_api.dart';
 import 'clients/admin_clients_page.dart';
@@ -13,6 +14,7 @@ class AdminNavigation extends StatelessWidget {
     super.key,
     required this.activeTab,
     required this.api,
+    this.onTabChanged,
   });
 
   static const primary = Color(0xFF0D2742);
@@ -20,6 +22,7 @@ class AdminNavigation extends StatelessWidget {
 
   final AdminTab activeTab;
   final BarberApi api;
+  final ValueChanged<AdminTab>? onTabChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -69,15 +72,125 @@ class AdminNavigation extends StatelessWidget {
 
   void _open(BuildContext context, AdminTab tab) {
     if (tab == activeTab) return;
+    HapticFeedback.selectionClick();
+    if (onTabChanged != null) {
+      onTabChanged!(tab);
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => switch (tab) {
-          AdminTab.home => AdminHomePage(api: api),
-          AdminTab.agenda => DailyAgendaPage(api: api),
-          AdminTab.clients => AdminClientsPage(api: api),
-          AdminTab.more => AdminMorePage(api: api),
-        },
+        builder: (_) => AdminShell(api: api, initialTab: tab),
       ),
+    );
+  }
+}
+
+class AdminShell extends StatefulWidget {
+  const AdminShell({
+    super.key,
+    required this.api,
+    this.initialTab = AdminTab.home,
+    this.homeToday,
+  });
+
+  final BarberApi api;
+  final AdminTab initialTab;
+  final DateTime? homeToday;
+
+  static bool selectTab(BuildContext context, AdminTab tab) {
+    final shell = context.findAncestorStateOfType<_AdminShellState>();
+    if (shell == null) return false;
+    shell.selectTab(tab);
+    return true;
+  }
+
+  @override
+  State<AdminShell> createState() => _AdminShellState();
+}
+
+class _AdminShellState extends State<AdminShell> {
+  late AdminTab _activeTab = widget.initialTab;
+
+  void selectTab(AdminTab tab) {
+    if (tab == _activeTab) return;
+    setState(() => _activeTab = tab);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final page = switch (_activeTab) {
+      AdminTab.home => AdminHomePage(
+          key: const ValueKey(AdminTab.home),
+          api: widget.api,
+          today: widget.homeToday,
+          embedded: true,
+        ),
+      AdminTab.agenda => DailyAgendaPage(
+          key: const ValueKey(AdminTab.agenda),
+          api: widget.api,
+          embedded: true,
+        ),
+      AdminTab.clients => AdminClientsPage(
+          key: const ValueKey(AdminTab.clients),
+          api: widget.api,
+          embedded: true,
+        ),
+      AdminTab.more => AdminMorePage(
+          key: const ValueKey(AdminTab.more),
+          api: widget.api,
+          embedded: true,
+        ),
+    };
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FA),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        transitionBuilder: (child, animation) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.08, 0),
+            end: Offset.zero,
+          ).animate(animation),
+          child: FadeTransition(opacity: animation, child: child),
+        ),
+        child: page,
+      ),
+      bottomNavigationBar: AdminNavigation(
+        activeTab: _activeTab,
+        api: widget.api,
+        onTabChanged: selectTab,
+      ),
+    );
+  }
+}
+
+class AdminBrandMark extends StatelessWidget {
+  const AdminBrandMark({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Jhow Cortes',
+          style: TextStyle(
+            color: AdminNavigation.primary,
+            fontSize: 17,
+            height: 1,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'BARBEARIA',
+          style: TextStyle(
+            color: AdminNavigation.muted,
+            fontSize: 7,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 3,
+          ),
+        ),
+      ],
     );
   }
 }

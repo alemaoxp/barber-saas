@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../models/booking_service.dart';
 import '../../../../services/barber_api.dart';
@@ -140,6 +141,7 @@ class _ServiceSelectionBottomSheetState
           service: service,
           selected: selected,
           onTap: () {
+            HapticFeedback.selectionClick();
             setState(() {
               selected
                   ? _selectedIds.remove(service.id)

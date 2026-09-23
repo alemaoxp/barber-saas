@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../services/barber_api.dart';
 import '../admin_navigation.dart';
@@ -42,10 +43,12 @@ String _monthName(DateTime date) {
 }
 
 class DailyAgendaPage extends StatefulWidget {
-  const DailyAgendaPage({super.key, this.api, this.initialDate});
+  const DailyAgendaPage(
+      {super.key, this.api, this.initialDate, this.embedded = false});
 
   final BarberApi? api;
   final DateTime? initialDate;
+  final bool embedded;
 
   @override
   State<DailyAgendaPage> createState() => _DailyAgendaPageState();
@@ -78,57 +81,59 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
 
   @override
   Widget build(BuildContext context) {
+    final content = SafeArea(
+      child: Column(
+        children: [
+          _Header(selectedDate: _selectedDate, onDateSelected: _selectDate),
+          Expanded(
+            child: FutureBuilder<DailyAgendaResponse>(
+              future: _agenda,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return _MessageState(
+                    title: 'Não foi possível carregar a agenda.',
+                    subtitle: snapshot.error is BarberApiException
+                        ? (snapshot.error as BarberApiException).message
+                        : 'Tente novamente em instantes.',
+                    action: TextButton(
+                      onPressed: () => _selectDate(_selectedDate),
+                      child: const Text('Tentar novamente'),
+                    ),
+                  );
+                }
+
+                final agenda = snapshot.requireData;
+                if (!agenda.workingDay) {
+                  return const _MessageState(
+                    title: 'Não há expediente neste dia.',
+                  );
+                }
+                if (agenda.slots.isEmpty) {
+                  return const _MessageState(
+                    title: 'Agenda vazia neste dia.',
+                  );
+                }
+
+                return _AgendaList(
+                  slots: agenda.slots,
+                  onCreateAppointment: _openNewAppointment,
+                  onOpenAppointment: _openAppointmentDetails,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+    if (widget.embedded) return content;
     return Scaffold(
       backgroundColor: _background,
       bottomNavigationBar:
           AdminNavigation(activeTab: AdminTab.agenda, api: _api),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _Header(selectedDate: _selectedDate, onDateSelected: _selectDate),
-            Expanded(
-              child: FutureBuilder<DailyAgendaResponse>(
-                future: _agenda,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return _MessageState(
-                      title: 'Não foi possível carregar a agenda.',
-                      subtitle: snapshot.error is BarberApiException
-                          ? (snapshot.error as BarberApiException).message
-                          : 'Tente novamente em instantes.',
-                      action: TextButton(
-                        onPressed: () => _selectDate(_selectedDate),
-                        child: const Text('Tentar novamente'),
-                      ),
-                    );
-                  }
-
-                  final agenda = snapshot.requireData;
-                  if (!agenda.workingDay) {
-                    return const _MessageState(
-                      title: 'Não há expediente neste dia.',
-                    );
-                  }
-                  if (agenda.slots.isEmpty) {
-                    return const _MessageState(
-                      title: 'Agenda vazia neste dia.',
-                    );
-                  }
-
-                  return _AgendaList(
-                    slots: agenda.slots,
-                    onCreateAppointment: _openNewAppointment,
-                    onOpenAppointment: _openAppointmentDetails,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: content,
     );
   }
 
@@ -136,6 +141,7 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
       DateTime(value.year, value.month, value.day);
 
   void _openNewAppointment(DailyAgendaSlot slot) {
+    HapticFeedback.selectionClick();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -156,6 +162,7 @@ class _DailyAgendaPageState extends State<DailyAgendaPage> {
   }
 
   Future<void> _openAppointmentDetails(DailyAgendaSlot slot) async {
+    HapticFeedback.selectionClick();
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => AppointmentDetailsPage(slot: slot, api: _api),
@@ -186,56 +193,7 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 42,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.menu_rounded),
-                    color: _DailyAgendaPageState._primary,
-                    tooltip: 'Menu',
-                  ),
-                ),
-                const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Jhow Cortes',
-                      style: TextStyle(
-                        color: _DailyAgendaPageState._primary,
-                        fontSize: 17,
-                        height: 1,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'BARBEARIA',
-                      style: TextStyle(
-                        color: _DailyAgendaPageState._muted,
-                        fontSize: 7,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                  ],
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications_rounded),
-                    color: _DailyAgendaPageState._primary,
-                    tooltip: 'Notificações',
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 42, child: Center(child: AdminBrandMark())),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -293,7 +251,10 @@ class _Header extends StatelessWidget {
                   key: Key('admin_day_${_dateParam(day)}'),
                   date: day,
                   selected: selected,
-                  onTap: () => onDateSelected(day),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    onDateSelected(day);
+                  },
                 );
               },
             ),
@@ -611,12 +572,77 @@ class AppointmentDetailsPage extends StatefulWidget {
 class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
   bool _saving = false;
 
+  Future<void> _editAppointment() async {
+    final slot = widget.slot;
+    final appointmentId = slot.appointmentId;
+    final customer = slot.customer;
+    if (appointmentId == null || customer == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => NewAppointmentBottomSheet(
+        slot: slot,
+        api: widget.api,
+        appointmentId: appointmentId,
+        initialCustomerId: customer.id,
+        initialCustomerName: customer.name,
+        initialServiceIds: slot.services.map((service) => service.id).toList(),
+        initialServiceLabel:
+            slot.services.map((service) => service.name).join(' + '),
+        onCreated: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
+        },
+      ),
+    );
+  }
+
+  Future<void> _cancelAppointment() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar agendamento?'),
+        content: const Text('O horário ficará disponível novamente.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Voltar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancelar agendamento'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || widget.slot.appointmentId == null) return;
+    setState(() => _saving = true);
+    try {
+      await widget.api.deleteAdminAppointment(widget.slot.appointmentId!);
+      if (mounted) Navigator.of(context).pop(true);
+    } on BarberApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _updateStatus(String status) async {
     final appointmentId = widget.slot.appointmentId;
     if (appointmentId == null) return;
     setState(() => _saving = true);
     try {
       await widget.api.updateAppointmentStatus(appointmentId, status);
+      HapticFeedback.mediumImpact();
       if (mounted) Navigator.of(context).pop(true);
     } on BarberApiException catch (error) {
       if (mounted) {
@@ -669,6 +695,19 @@ class _AppointmentDetailsPageState extends State<AppointmentDetailsPage> {
           Text(_time(slot.dateTime)),
           const SizedBox(height: 8),
           Text(slot.services.map((service) => service.name).join(' + ')),
+          if (slot.appointmentStatus == 'SCHEDULED') ...[
+            const SizedBox(height: 24),
+            OutlinedButton(
+              onPressed: _saving ? null : _editAppointment,
+              child: const Text('Editar agendamento'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: _saving ? null : _cancelAppointment,
+              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Cancelar agendamento'),
+            ),
+          ],
           if (canMarkNoShow) ...[
             const SizedBox(height: 24),
             OutlinedButton(

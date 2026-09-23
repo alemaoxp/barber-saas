@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../services/barber_api.dart';
 import 'weekly_schedule_models.dart';
@@ -52,6 +53,7 @@ class _AdminWorkingHoursPageState extends State<AdminWorkingHoursPage> {
     });
     try {
       final response = await _api.updateWeeklySchedule(_days);
+      HapticFeedback.lightImpact();
       if (!mounted) return;
       setState(() {
         _days = response.weeklySchedule;

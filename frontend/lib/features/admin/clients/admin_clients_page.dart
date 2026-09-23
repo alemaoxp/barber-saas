@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../features/admin/daily_agenda/models/admin_customer_summary.dart';
 import '../../../formatters/brazilian_phone_input_formatter.dart';
@@ -6,9 +7,10 @@ import '../../../services/barber_api.dart';
 import '../admin_navigation.dart';
 
 class AdminClientsPage extends StatefulWidget {
-  const AdminClientsPage({super.key, this.api});
+  const AdminClientsPage({super.key, this.api, this.embedded = false});
 
   final BarberApi? api;
+  final bool embedded;
 
   @override
   State<AdminClientsPage> createState() => _AdminClientsPageState();
@@ -85,71 +87,79 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final content = SafeArea(
+      child: Column(
+        children: [
+          const _Header(),
+          Expanded(
+            child: FutureBuilder<List<AdminCustomerSummary>>(
+              future: _clients,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return _MessageState(
+                    title: 'Não foi possível carregar os clientes.',
+                    subtitle: snapshot.error is BarberApiException
+                        ? (snapshot.error as BarberApiException).message
+                        : 'Tente novamente em instantes.',
+                    action: TextButton(
+                      onPressed: _reload,
+                      child: const Text('Tentar novamente'),
+                    ),
+                  );
+                }
+                final clients = snapshot.requireData;
+                if (clients.isEmpty) {
+                  return const _MessageState(
+                    title: 'Nenhum cliente cadastrado.',
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(22, 22, 22, 96),
+                  itemCount: clients.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final client = clients[index];
+                    return Dismissible(
+                      key: ValueKey('admin-client-${client.id}'),
+                      direction: DismissDirection.endToStart,
+                      background: const SizedBox.shrink(),
+                      secondaryBackground: const _DeleteSwipeBackground(),
+                      onDismissed: (_) => _deleteClient(client),
+                      child: _ClientTile(
+                        client: client,
+                        onTap: () => _openClientDetails(client),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+    final addClient = FloatingActionButton.extended(
+      onPressed: _openNewClient,
+      backgroundColor: _primary,
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.add_rounded),
+      label: const Text('Novo cliente'),
+    );
+    if (widget.embedded) {
+      return Stack(children: [
+        content,
+        Positioned(right: 16, bottom: 16, child: addClient)
+      ]);
+    }
     return Scaffold(
       backgroundColor: _background,
       bottomNavigationBar:
           AdminNavigation(activeTab: AdminTab.clients, api: _api),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const _Header(),
-            Expanded(
-              child: FutureBuilder<List<AdminCustomerSummary>>(
-                future: _clients,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return _MessageState(
-                      title: 'Não foi possível carregar os clientes.',
-                      subtitle: snapshot.error is BarberApiException
-                          ? (snapshot.error as BarberApiException).message
-                          : 'Tente novamente em instantes.',
-                      action: TextButton(
-                        onPressed: _reload,
-                        child: const Text('Tentar novamente'),
-                      ),
-                    );
-                  }
-                  final clients = snapshot.requireData;
-                  if (clients.isEmpty) {
-                    return const _MessageState(
-                      title: 'Nenhum cliente cadastrado.',
-                    );
-                  }
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(22, 22, 22, 96),
-                    itemCount: clients.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final client = clients[index];
-                      return Dismissible(
-                        key: ValueKey('admin-client-${client.id}'),
-                        direction: DismissDirection.endToStart,
-                        background: const SizedBox.shrink(),
-                        secondaryBackground: const _DeleteSwipeBackground(),
-                        onDismissed: (_) => _deleteClient(client),
-                        child: _ClientTile(
-                          client: client,
-                          onTap: () => _openClientDetails(client),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openNewClient,
-        backgroundColor: _primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Novo cliente'),
-      ),
+      body: content,
+      floatingActionButton: addClient,
     );
   }
 }
@@ -312,6 +322,7 @@ class _ClientDetailsBottomSheetState extends State<_ClientDetailsBottomSheet> {
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
       );
+      HapticFeedback.lightImpact();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -512,6 +523,7 @@ class _NewClientBottomSheetState extends State<_NewClientBottomSheet> {
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
       );
+      HapticFeedback.lightImpact();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../models/booking_service.dart';
 import '../../../services/barber_api.dart';
@@ -331,6 +332,7 @@ class _ServiceDetailsBottomSheetState
         name: _nameController.text.trim(),
         price: _parsePrice(_priceController.text),
       );
+      HapticFeedback.lightImpact();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -534,6 +536,7 @@ class _NewServiceBottomSheetState extends State<_NewServiceBottomSheet> {
         name: _nameController.text.trim(),
         price: _parsePrice(_priceController.text),
       );
+      HapticFeedback.lightImpact();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

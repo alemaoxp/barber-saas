@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:barber_saas_mobile/features/admin/daily_agenda/daily_agenda_page.dart';
 import 'package:barber_saas_mobile/features/admin/more/admin_schedule_blocks_page.dart';
-import 'package:barber_saas_mobile/features/admin/more/admin_settings_page.dart';
 import 'package:barber_saas_mobile/features/admin/more/admin_more_page.dart';
 import 'package:barber_saas_mobile/features/admin/more/admin_working_hours_page.dart';
 import 'package:barber_saas_mobile/features/admin/services/admin_services_page.dart';
@@ -41,8 +40,7 @@ void main() {
     expect(find.text('Serviços e preços'), findsOneWidget);
     expect(find.text('Bloqueios da agenda'), findsOneWidget);
     expect(find.text('Folgas, férias e indisponibilidades'), findsOneWidget);
-    expect(find.text('Configurações'), findsOneWidget);
-    expect(find.text('Preferências do Admin'), findsOneWidget);
+    expect(find.text('Configurações'), findsNothing);
     expect(find.text('Sair'), findsOneWidget);
   });
 
@@ -69,19 +67,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AdminMorePage), findsOneWidget);
-  });
-
-  testWidgets('abre configurações sem erro', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: AdminMorePage()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Configurações'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AdminSettingsPage), findsOneWidget);
-    expect(
-      find.text('Ainda não há opções configuráveis disponíveis.'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('abre bloqueios, lista, cria e exclui', (tester) async {

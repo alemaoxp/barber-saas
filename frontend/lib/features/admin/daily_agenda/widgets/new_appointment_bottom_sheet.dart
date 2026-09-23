@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../models/booking_service.dart';
 import '../../../../services/barber_api.dart';
@@ -54,11 +55,21 @@ class NewAppointmentBottomSheet extends StatefulWidget {
     required this.slot,
     required this.api,
     required this.onCreated,
+    this.appointmentId,
+    this.initialCustomerId,
+    this.initialCustomerName,
+    this.initialServiceIds = const [],
+    this.initialServiceLabel,
   });
 
   final DailyAgendaSlot slot;
   final BarberApi api;
   final VoidCallback onCreated;
+  final String? appointmentId;
+  final String? initialCustomerId;
+  final String? initialCustomerName;
+  final List<String> initialServiceIds;
+  final String? initialServiceLabel;
 
   static const _primary = Color(0xFF0D2742);
   static const _muted = Color(0xFF6C7886);
@@ -75,8 +86,15 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
   bool _saving = false;
   String? _error;
 
+  bool get _isEditing => widget.appointmentId != null;
+  String? get _customerId => _selectedCustomer?.id ?? widget.initialCustomerId;
+  String? get _customerName =>
+      _selectedCustomer?.name ?? widget.initialCustomerName;
+  List<String> get _serviceIds => _selectedServices.isNotEmpty
+      ? _selectedServices.map((service) => service.id).toList()
+      : widget.initialServiceIds;
   bool get _canContinue =>
-      !_saving && _selectedCustomer != null && _selectedServices.isNotEmpty;
+      !_saving && _customerId != null && _serviceIds.isNotEmpty;
 
   double get _servicesTotal => _selectedServices.fold<double>(
         0,
@@ -110,33 +128,52 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
       ),
       builder: (_) => ServiceSelectionBottomSheet(
         api: widget.api,
-        initialServices: _selectedServices,
+        initialServices: _selectedServices.isEmpty
+            ? widget.initialServiceIds
+                .map((id) => BookingService(
+                      id: id,
+                      name: '',
+                      description: '',
+                      price: 0,
+                    ))
+                .toList()
+            : _selectedServices,
       ),
     );
     if (!mounted || services == null) return;
     setState(() => _selectedServices = services);
   }
 
-  Future<void> _createAppointment() async {
+  Future<void> _saveAppointment() async {
     if (!_canContinue) return;
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      await widget.api.createAdminAppointment(
-        customerId: _selectedCustomer!.id,
-        serviceIds: _selectedServices.map((service) => service.id).toList(),
-        appointmentDateTime: widget.slot.dateTime,
-      );
+      if (_isEditing) {
+        await widget.api.updateAdminAppointment(
+          appointmentId: widget.appointmentId!,
+          customerId: _customerId!,
+          serviceIds: _serviceIds,
+          appointmentDateTime: widget.slot.dateTime,
+        );
+      } else {
+        await widget.api.createAdminAppointment(
+          customerId: _customerId!,
+          serviceIds: _serviceIds,
+          appointmentDateTime: widget.slot.dateTime,
+        );
+      }
       if (!mounted) return;
+      HapticFeedback.lightImpact();
       widget.onCreated();
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _error = error is BarberApiException
             ? error.message
-            : 'Não foi possível criar o agendamento.';
+            : 'Não foi possível salvar o agendamento.';
         _saving = false;
       });
     }
@@ -167,8 +204,8 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
                 ),
               ),
             ),
-            const Text(
-              'Novo agendamento',
+            Text(
+              _isEditing ? 'Editar agendamento' : 'Novo agendamento',
               style: TextStyle(
                 color: NewAppointmentBottomSheet._primary,
                 fontSize: 24,
@@ -198,7 +235,7 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
             const SizedBox(height: 26),
             _SheetSection(
               title: 'Cliente',
-              actionLabel: _selectedCustomer?.name ?? 'Selecionar cliente',
+              actionLabel: _customerName ?? 'Selecionar cliente',
               subtitle: _selectedCustomer?.phone,
               onTap: _selectCustomer,
             ),
@@ -206,7 +243,7 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
             _SheetSection(
               title: 'Serviços',
               actionLabel: _selectedServices.isEmpty
-                  ? 'Selecionar serviços'
+                  ? widget.initialServiceLabel ?? 'Selecionar serviços'
                   : _selectedServices
                       .map((service) => service.name)
                       .join(' + '),
@@ -231,7 +268,7 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _canContinue ? _createAppointment : null,
+                onPressed: _canContinue ? _saveAppointment : null,
                 style: ElevatedButton.styleFrom(
                   disabledBackgroundColor: NewAppointmentBottomSheet._primary
                       .withValues(alpha: 0.36),
@@ -241,7 +278,9 @@ class _NewAppointmentBottomSheetState extends State<NewAppointmentBottomSheet> {
                   ),
                 ),
                 child: Text(
-                  _saving ? 'Criando...' : 'Continuar',
+                  _saving
+                      ? (_isEditing ? 'Salvando...' : 'Criando...')
+                      : (_isEditing ? 'Salvar alterações' : 'Continuar'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,

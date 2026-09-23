@@ -34,6 +34,12 @@ void main() {
         if (request.url.path == '/api/auth/login') {
           return http.Response(jsonEncode(_loginJson), 200);
         }
+        if (request.url.path.endsWith('/dashboard/summary')) {
+          return http.Response(jsonEncode(_summaryJson), 200);
+        }
+        if (request.url.path.endsWith('/next-appointment')) {
+          return http.Response('', 204);
+        }
         return http.Response(jsonEncode(_agendaJson), 200);
       }),
     );
@@ -47,7 +53,7 @@ void main() {
     await tester.enterText(
         find.widgetWithText(TextFormField, 'Senha'), 'secret');
     await tester.tap(find.text('Entrar'));
-    await tester.pumpAndSettle();
+    await _pumpAdminHome(tester);
 
     expect(await store.token(), 'raw-token');
     expect(find.byType(AdminHomePage), findsOneWidget);
@@ -84,13 +90,19 @@ void main() {
         if (request.url.path == '/api/auth/me') {
           return http.Response(jsonEncode(_adminUserJson), 200);
         }
+        if (request.url.path.endsWith('/dashboard/summary')) {
+          return http.Response(jsonEncode(_summaryJson), 200);
+        }
+        if (request.url.path.endsWith('/next-appointment')) {
+          return http.Response('', 204);
+        }
         return http.Response(jsonEncode(_agendaJson), 200);
       }),
     );
 
     await tester
         .pumpWidget(MaterialApp(home: AdminGate(store: store, api: api)));
-    await tester.pumpAndSettle();
+    await _pumpAdminHome(tester);
 
     expect(await store.token(), 'saved');
     expect(find.byType(AdminHomePage), findsOneWidget);
@@ -129,6 +141,12 @@ void main() {
           }
           return http.Response(jsonEncode(_adminUserJson), 200);
         }
+        if (request.url.path.endsWith('/dashboard/summary')) {
+          return http.Response(jsonEncode(_summaryJson), 200);
+        }
+        if (request.url.path.endsWith('/next-appointment')) {
+          return http.Response('', 204);
+        }
         return http.Response(jsonEncode(_agendaJson), 200);
       }),
     );
@@ -141,7 +159,7 @@ void main() {
     expect(find.text('Não foi possível confirmar sua sessão.'), findsOneWidget);
 
     await tester.tap(find.text('Tentar novamente'));
-    await tester.pumpAndSettle();
+    await _pumpAdminHome(tester);
 
     expect(meCalls, 2);
     expect(await store.token(), 'saved');
@@ -189,6 +207,11 @@ void main() {
   });
 }
 
+Future<void> _pumpAdminHome(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump();
+}
+
 const _adminUserJson = {
   'id': 'admin-1',
   'name': 'Jhow',
@@ -207,4 +230,12 @@ const _agendaJson = {
   'date': '2026-09-09',
   'workingDay': true,
   'slots': [],
+};
+
+const _summaryJson = {
+  'barberId': barberId,
+  'startDate': '2026-09-01',
+  'endDate': '2026-09-30',
+  'appointmentCount': 0,
+  'scheduledValue': 0,
 };
