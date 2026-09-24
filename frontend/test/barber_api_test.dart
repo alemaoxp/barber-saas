@@ -43,12 +43,12 @@ void main() {
         calls++;
         if (calls == 1) {
           expect(request.method, 'GET');
-          expect(request.url.path, '/api/dev/push/public-key');
+          expect(request.url.path, '/api/public/push/public-key');
           return http.Response(
               jsonEncode({'publicKey': 'vapid-public-key'}), 200);
         }
         expect(request.method, 'POST');
-        expect(request.url.path, '/api/dev/push/subscription');
+        expect(request.url.path, '/api/public/push/subscriptions');
         expect(jsonDecode(request.body), {
           'endpoint': 'https://push.example.test/subscription',
           'p256dh': 'p256dh-key',
@@ -75,7 +75,7 @@ void main() {
         if (request.method == 'GET') {
           return http.Response(jsonEncode({'publicKey': 'vapid-public-key'}), 200);
         }
-        if (request.url.path == '/api/dev/push/subscription') {
+        if (request.url.path == '/api/public/push/subscriptions') {
           return http.Response('', 204);
         }
         return http.Response(jsonEncode({
@@ -94,8 +94,8 @@ void main() {
     await api.activateAvailabilityInterest('customer-1', 'appointment-1');
 
     expect(paths, [
-      '/api/dev/push/public-key',
-      '/api/dev/push/subscription',
+      '/api/public/push/public-key',
+      '/api/public/push/subscriptions',
       '/api/v1/customers/customer-1/availability-interests',
     ]);
   });

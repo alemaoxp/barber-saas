@@ -4,8 +4,8 @@ import com.barbersaas.customers.repository.CustomerRepository;
 import com.barbersaas.push.dto.PushSubscriptionRequest;
 import com.barbersaas.push.entity.PushSubscriptionEntity;
 import com.barbersaas.push.repository.PushSubscriptionRepository;
-import com.barbersaas.push.service.PushTestProperties;
-import com.barbersaas.push.service.PushTestService;
+import com.barbersaas.push.service.PushProperties;
+import com.barbersaas.push.service.WebPushService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,16 +76,16 @@ class PushSubscriptionPersistenceIntegrationTest {
                   AND contype = 'f'
                 """, Integer.class));
 
-        PushTestProperties properties = new PushTestProperties();
+        PushProperties properties = enabledProperties();
         properties.setEnabled(true);
-        PushTestService firstService = new PushTestService(properties, subscriptions, customers);
+        WebPushService firstService = new WebPushService(properties, subscriptions, customers);
         firstService.save(new PushSubscriptionRequest(
                 "https://push.example.test/restart", "key-v1", "auth-v1", customerId));
         LocalDateTime firstUpdatedAt = jdbc.queryForObject(
                 "SELECT updated_at FROM push_subscriptions WHERE endpoint = ?",
                 LocalDateTime.class, "https://push.example.test/restart");
 
-        PushTestService restartedService = new PushTestService(properties, subscriptions, customers);
+        WebPushService restartedService = new WebPushService(properties, subscriptions, customers);
         Thread.sleep(10);
         restartedService.save(new PushSubscriptionRequest(
                 "https://push.example.test/restart", "key-v2", "auth-v2", customerId));
@@ -105,7 +105,7 @@ class PushSubscriptionPersistenceIntegrationTest {
     @Test
     void concurrentRegistrationForSameCustomerIsIdempotent() throws Exception {
         String endpoint = "https://push.example.test/concurrent-same-customer-" + UUID.randomUUID();
-        PushTestService service = enabledService();
+        WebPushService service = enabledService();
         List<Throwable> failures = runConcurrently(
                 () -> service.save(new PushSubscriptionRequest(
                         endpoint, "key-a", "auth-a", customerId)),
@@ -125,7 +125,7 @@ class PushSubscriptionPersistenceIntegrationTest {
     @Test
     void concurrentRegistrationForDifferentCustomersRejectsOnlyTheLoser() throws Exception {
         String endpoint = "https://push.example.test/concurrent-different-customers-" + UUID.randomUUID();
-        PushTestService service = enabledService();
+        WebPushService service = enabledService();
         List<Throwable> failures = runConcurrently(
                 () -> service.save(new PushSubscriptionRequest(
                         endpoint, "key-a", "auth-a", customerId)),
@@ -144,10 +144,17 @@ class PushSubscriptionPersistenceIntegrationTest {
         assertTrue(Set.of(customerId, secondCustomerId).contains(owner));
     }
 
-    private PushTestService enabledService() {
-        PushTestProperties properties = new PushTestProperties();
+    private WebPushService enabledService() {
+        return new WebPushService(enabledProperties(), subscriptions, customers);
+    }
+
+    private PushProperties enabledProperties() {
+        PushProperties properties = new PushProperties();
         properties.setEnabled(true);
-        return new PushTestService(properties, subscriptions, customers);
+        properties.setVapidPublicKey("public");
+        properties.setVapidPrivateKey("private");
+        properties.setVapidSubject("mailto:test@example.com");
+        return properties;
     }
 
     private List<Throwable> runConcurrently(ThrowingRunnable... operations)

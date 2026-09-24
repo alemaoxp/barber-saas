@@ -19,15 +19,15 @@ public class AvailabilityPushNotifier {
     private static final Logger LOGGER = LoggerFactory.getLogger(AvailabilityPushNotifier.class);
 
     private final AvailabilityInterestRepository interestRepository;
-    private final PushTestService pushTestService;
+    private final WebPushService webPushService;
     private final BarberRepository barberRepository;
 
     public AvailabilityPushNotifier(
             AvailabilityInterestRepository interestRepository,
-            PushTestService pushTestService,
+            WebPushService webPushService,
             BarberRepository barberRepository) {
         this.interestRepository = interestRepository;
-        this.pushTestService = pushTestService;
+        this.webPushService = webPushService;
         this.barberRepository = barberRepository;
     }
 
@@ -60,14 +60,14 @@ public class AvailabilityPushNotifier {
                 continue;
             }
             try {
-                pushTestService.sendAvailabilityNotification(
+                webPushService.sendAvailabilityNotification(
                         interest.getCustomer().getId(),
                         interest.getId(),
                         event.availableSlotId());
             } catch (RuntimeException exception) {
                 LOGGER.warn("Não foi possível alertar o cliente {} sobre a vaga {}: {}.",
                         interest.getCustomer().getId(), event.availableDateTime(),
-                        PushTestService.safeDiagnosticMessage(exception));
+                        WebPushService.safeDiagnosticMessage(exception));
             }
         }
     }

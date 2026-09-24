@@ -40,15 +40,18 @@ class PushSubscriptionPersistenceTest {
     @Mock
     private CustomerRepository customers;
 
-    private PushTestService service;
+    private WebPushService service;
     private CustomerEntity customerA;
     private CustomerEntity customerB;
 
     @BeforeEach
     void setUp() {
-        PushTestProperties properties = new PushTestProperties();
+        PushProperties properties = new PushProperties();
         properties.setEnabled(true);
-        service = new PushTestService(properties, subscriptions, customers);
+        properties.setVapidPublicKey("public");
+        properties.setVapidPrivateKey("private");
+        properties.setVapidSubject("mailto:test@example.com");
+        service = new WebPushService(properties, subscriptions, customers);
         customerA = customer(CUSTOMER_A);
         customerB = customer(CUSTOMER_B);
     }
@@ -122,16 +125,16 @@ class PushSubscriptionPersistenceTest {
     @ParameterizedTest
     @ValueSource(ints = {404, 410})
     void removesOnlyTheSubscriptionRejectedAsGoneByTheProvider(int status) {
-        PushTestProperties properties = new PushTestProperties();
+        PushProperties properties = enabledProperties();
         properties.setEnabled(true);
         PushSubscriptionEntity first = subscription(CUSTOMER_A, "https://push.example.test/a", "key-a", "auth-a");
         PushSubscriptionEntity second = subscription(CUSTOMER_A, "https://push.example.test/b", "key-b", "auth-b");
         when(subscriptions.findAllByCustomerId(CUSTOMER_A)).thenReturn(List.of(first, second));
-        PushTestService deliveryService = new PushTestService(
+        WebPushService deliveryService = new WebPushService(
                 properties, subscriptions, customers,
                 (target, payload) -> target.endpoint().endsWith("/a")
-                        ? new PushTestService.ProviderResponse(status)
-                        : new PushTestService.ProviderResponse(201));
+                        ? new WebPushService.ProviderResponse(status)
+                        : new WebPushService.ProviderResponse(201));
 
         deliveryService.sendAvailabilityNotification(CUSTOMER_A,
                 UUID.fromString("40000000-0000-0000-0000-000000000001"),
@@ -143,17 +146,16 @@ class PushSubscriptionPersistenceTest {
 
     @Test
     void sendsEveryInterestToEveryDeviceWithoutDeduplicatingTheCustomer() {
-        PushTestProperties properties = new PushTestProperties();
-        properties.setEnabled(true);
+        PushProperties properties = enabledProperties();
         PushSubscriptionEntity first = subscription(CUSTOMER_A, "https://push.example.test/a", "key-a", "auth-a");
         PushSubscriptionEntity second = subscription(CUSTOMER_A, "https://push.example.test/b", "key-b", "auth-b");
         when(subscriptions.findAllByCustomerId(CUSTOMER_A)).thenReturn(List.of(first, second));
         List<String> payloads = new ArrayList<>();
-        PushTestService deliveryService = new PushTestService(
+        WebPushService deliveryService = new WebPushService(
                 properties, subscriptions, customers,
                 (target, payload) -> {
                     payloads.add(target.endpoint() + ":" + payload);
-                    return new PushTestService.ProviderResponse(201);
+                    return new WebPushService.ProviderResponse(201);
                 });
         UUID interestA = UUID.fromString("40000000-0000-0000-0000-000000000001");
         UUID interestB = UUID.fromString("40000000-0000-0000-0000-000000000002");
@@ -167,22 +169,22 @@ class PushSubscriptionPersistenceTest {
         assertEquals(2, payloads.stream().filter(payload -> payload.contains(interestB.toString())).count());
     }
 
-    @Test
-    void providerFailureDoesNotDeleteOrStopTheOtherDevice() {
-        PushTestProperties properties = new PushTestProperties();
-        properties.setEnabled(true);
+    @ParameterizedTest
+    @ValueSource(ints = {400, 401, 403, 429, 500, 503})
+    void providerFailureDoesNotDeleteOrStopTheOtherDevice(int status) {
+        PushProperties properties = enabledProperties();
         PushSubscriptionEntity first = subscription(CUSTOMER_A, "https://push.example.test/a", "key-a", "auth-a");
         PushSubscriptionEntity second = subscription(CUSTOMER_A, "https://push.example.test/b", "key-b", "auth-b");
         when(subscriptions.findAllByCustomerId(CUSTOMER_A)).thenReturn(List.of(first, second));
         List<String> sent = new ArrayList<>();
-        PushTestService deliveryService = new PushTestService(
+        WebPushService deliveryService = new WebPushService(
                 properties, subscriptions, customers,
                 (target, payload) -> {
                     sent.add(target.endpoint());
                     if (target.endpoint().endsWith("/a")) {
                         throw new IOException("timeout");
                     }
-                    return new PushTestService.ProviderResponse(503);
+                    return new WebPushService.ProviderResponse(status);
                 });
 
         deliveryService.sendAvailabilityNotification(CUSTOMER_A,
@@ -195,6 +197,15 @@ class PushSubscriptionPersistenceTest {
 
     private PushSubscriptionRequest request(String endpoint, UUID customerId, String p256dh, String auth) {
         return new PushSubscriptionRequest(endpoint, p256dh, auth, customerId);
+    }
+
+    private PushProperties enabledProperties() {
+        PushProperties properties = new PushProperties();
+        properties.setEnabled(true);
+        properties.setVapidPublicKey("public");
+        properties.setVapidPrivateKey("private");
+        properties.setVapidSubject("mailto:test@example.com");
+        return properties;
     }
 
     private PushSubscriptionEntity subscription(UUID customerId, String endpoint, String p256dh, String auth) {

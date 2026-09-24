@@ -53,7 +53,7 @@ class AvailabilityPushNotifierTest {
     private BarberRepository barberRepository;
 
     @Mock
-    private PushTestService pushTestService;
+    private WebPushService pushTestService;
 
     @Test
     void notifiesOnlyActiveEligibleInterestAfterCommit() throws Exception {

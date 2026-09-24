@@ -23,6 +23,10 @@ app:
 
 # Development-only Web Push probe. Never enable these endpoints in production.
 push:
+  enabled: ${PUSH_ENABLED:${PUSH_TEST_ENABLED:false}}
+  vapid-public-key: ${PUSH_VAPID_PUBLIC_KEY:${PUSH_TEST_VAPID_PUBLIC_KEY:}}
+  vapid-private-key: ${PUSH_VAPID_PRIVATE_KEY:${PUSH_TEST_VAPID_PRIVATE_KEY:}}
+  vapid-subject: ${PUSH_VAPID_SUBJECT:${PUSH_TEST_VAPID_SUBJECT:mailto:dev@localhost}}
   test:
     enabled: ${PUSH_TEST_ENABLED:false}
     vapid-public-key: ${PUSH_TEST_VAPID_PUBLIC_KEY:}

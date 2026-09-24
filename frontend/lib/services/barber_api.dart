@@ -366,14 +366,14 @@ class BarberApi {
 
   Future<void> registerPushSubscription(String customerId) async {
     final keyResponse =
-        await _client.get(Uri.parse('$apiBaseUrl/api/dev/push/public-key'));
+        await _client.get(Uri.parse('$apiBaseUrl/api/public/push/public-key'));
     _ensureSuccess(keyResponse);
     final publicKey = (jsonDecode(keyResponse.body)
         as Map<String, dynamic>)['publicKey'] as String;
     final subscription = await _createPushSubscription(publicKey);
     final keys = subscription['keys'] as Map<String, dynamic>;
     final response = await _client.post(
-      Uri.parse('$apiBaseUrl/api/dev/push/subscription'),
+      Uri.parse('$apiBaseUrl/api/public/push/subscriptions'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'endpoint': subscription['endpoint'],

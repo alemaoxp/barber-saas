@@ -2,7 +2,7 @@ package com.barbersaas.push.controller;
 
 import com.barbersaas.push.dto.PushPublicKeyResponse;
 import com.barbersaas.push.dto.PushSubscriptionRequest;
-import com.barbersaas.push.service.PushTestService;
+import com.barbersaas.push.service.WebPushService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,34 +10,25 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.context.annotation.Profile;
 
-/** DEVELOPMENT ONLY: intentionally disabled unless PUSH_TEST_ENABLED=true. */
 @RestController
-@Profile("local")
-@RequestMapping("/api/dev/push")
-public class PushTestController {
+@RequestMapping("/api/public/push")
+public class PublicPushController {
 
-    private final PushTestService pushTestService;
+    private final WebPushService webPushService;
 
-    public PushTestController(PushTestService pushTestService) {
-        this.pushTestService = pushTestService;
+    public PublicPushController(WebPushService webPushService) {
+        this.webPushService = webPushService;
     }
 
     @GetMapping("/public-key")
     public PushPublicKeyResponse publicKey() {
-        return new PushPublicKeyResponse(pushTestService.publicKey());
+        return new PushPublicKeyResponse(webPushService.publicKey());
     }
 
-    @PostMapping("/subscription")
+    @PostMapping("/subscriptions")
     public ResponseEntity<Void> save(@Valid @RequestBody PushSubscriptionRequest request) {
-        pushTestService.save(request);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/send")
-    public ResponseEntity<Void> send() {
-        pushTestService.sendTestNotification();
+        webPushService.save(request);
         return ResponseEntity.noContent().build();
     }
 }

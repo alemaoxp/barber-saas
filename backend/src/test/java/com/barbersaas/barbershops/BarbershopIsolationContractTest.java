@@ -25,7 +25,7 @@ import com.barbersaas.barbers.dto.CreateBarberRequest;
 import com.barbersaas.exception.BusinessException;
 import com.barbersaas.exception.NotFoundException;
 import com.barbersaas.push.service.AvailabilityPushNotifier;
-import com.barbersaas.push.service.PushTestService;
+import com.barbersaas.push.service.WebPushService;
 import com.barbersaas.services.entity.ServiceEntity;
 import com.barbersaas.services.mapper.ServiceMapper;
 import com.barbersaas.services.repository.ServiceRepository;
@@ -113,7 +113,7 @@ class BarbershopIsolationContractTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
-    private PushTestService pushTestService;
+    private WebPushService pushTestService;
 
     @Test
     void adminBarberCannotReadCustomerFromAnotherBarbershop() {
