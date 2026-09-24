@@ -30,12 +30,15 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,6 +61,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceTest {
+    private static final LocalDateTime TEST_NOW = LocalDateTime.of(2026, 8, 1, 12, 0);
     private static final UUID BARBERSHOP_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
 
     private static final UUID BARBER_ID =
@@ -114,7 +118,11 @@ class AppointmentServiceTest {
                 scheduleBlockService,
                 weeklyScheduleService,
                 availableSlotService,
-                eventPublisher
+                eventPublisher,
+                Clock.fixed(
+                        TEST_NOW.atZone(ZoneId.systemDefault()).toInstant(),
+                        ZoneId.systemDefault()
+                )
         );
 
         barber = barber();
@@ -132,6 +140,10 @@ class AppointmentServiceTest {
                 .thenReturn(Optional.of(service30Minutes));
         lenient().when(appointmentRepository.save(any(AppointmentEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(appointmentRepository.saveAndFlush(any(AppointmentEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(weeklyScheduleService.getMaxBookingDays(BARBER_ID))
+                .thenReturn(365);
         lenient().when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
                 eq(BARBER_ID),
                 any(),
@@ -142,6 +154,85 @@ class AppointmentServiceTest {
     @Test
     void mondayAt0930ShouldBeAllowed() {
         assertCreateAllowed(LocalDateTime.of(2026, 8, 31, 9, 30));
+    }
+
+    @Test
+    void pastAppointmentShouldBeRejected() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> createAt(TEST_NOW.minusMinutes(1))
+        );
+
+        assertEquals("O horário do agendamento deve estar no futuro.", exception.getMessage());
+        verify(appointmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void appointmentAtExactlyNowShouldBeRejected() {
+        LocalDateTime now = TEST_NOW;
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> createAt(now)
+        );
+
+        assertEquals("O horário do agendamento deve estar no futuro.", exception.getMessage());
+        verify(appointmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void appointmentBeyondConfiguredBookingWindowShouldBeRejected() {
+        when(weeklyScheduleService.getMaxBookingDays(BARBER_ID))
+                .thenReturn(30);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> createAt(TEST_NOW.plusDays(31))
+        );
+
+        assertEquals("O agendamento excede a janela permitida.", exception.getMessage());
+        verify(appointmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void appointmentAtConfiguredBookingWindowBoundaryShouldBeAllowed() {
+        when(weeklyScheduleService.getMaxBookingDays(BARBER_ID))
+                .thenReturn(30);
+
+        assertDoesNotThrow(() -> createAt(TEST_NOW.plusDays(30).withHour(9).withMinute(30)));
+    }
+
+    @Test
+    void publicCreateShouldRejectPastAppointment() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.createPublic(
+                        BARBER_ID,
+                        new CreateAppointmentRequest(
+                                CUSTOMER_ID,
+                                List.of(SERVICE_ID),
+                                TEST_NOW.minusMinutes(1),
+                                null
+                        )
+                )
+        );
+
+        assertEquals("O horário do agendamento deve estar no futuro.", exception.getMessage());
+    }
+
+    @Test
+    void scheduledSlotConstraintViolationShouldBecomeAvailabilityError() {
+        when(appointmentRepository.saveAndFlush(any(AppointmentEntity.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "ux_appointments_scheduled_slot"
+                ));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> createAt(TEST_NOW.plusDays(1))
+        );
+
+        assertEquals("Horário indisponível.", exception.getMessage());
     }
 
     @Test
@@ -286,6 +377,44 @@ class AppointmentServiceTest {
                         )
                 )
         );
+    }
+
+    @Test
+    void updateScheduledSlotConstraintViolationShouldBecomeAvailabilityError() {
+        LocalDateTime dateTime = LocalDateTime.of(2026, 9, 2, 10, 0);
+        AppointmentEntity appointment = existingAppointment(
+                dateTime,
+                40,
+                AppointmentStatus.SCHEDULED
+        );
+        ReflectionTestUtils.setField(appointment, "id", APPOINTMENT_ID);
+        when(appointmentRepository.findByIdAndBarberId(APPOINTMENT_ID, BARBER_ID))
+                .thenReturn(Optional.of(appointment));
+        when(appointmentRepository.findByBarberIdAndAppointmentDateTimeBetween(
+                eq(BARBER_ID),
+                eq(dateTime.minusHours(8)),
+                eq(dateTime.plusMinutes(30))
+        )).thenReturn(List.of(appointment));
+        when(appointmentRepository.saveAndFlush(any(AppointmentEntity.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "ux_appointments_scheduled_slot"
+                ));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> appointmentService.update(
+                        BARBER_ID,
+                        APPOINTMENT_ID,
+                        new UpdateAppointmentRequest(
+                                CUSTOMER_ID,
+                                List.of(SERVICE_ID),
+                                dateTime,
+                                "teste"
+                        )
+                )
+        );
+
+        assertEquals("Horário indisponível.", exception.getMessage());
     }
 
     @Test

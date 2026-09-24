@@ -369,8 +369,8 @@ public class AvailabilityInterestService {
         slot.setStatus(AvailableSlotStatus.BOOKED);
         interest.setStatus(AvailabilityInterestStatus.COMPLETED);
 
+        appointmentService.saveScheduledAppointment(appointment);
         availableSlotRepository.save(slot);
-        appointmentRepository.save(appointment);
         AvailabilityInterestEntity savedInterest =
                 availabilityInterestRepository.save(interest);
 

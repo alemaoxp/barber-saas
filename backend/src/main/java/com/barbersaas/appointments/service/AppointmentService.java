@@ -30,16 +30,18 @@ import com.barbersaas.services.entity.ServiceEntity;
 import com.barbersaas.services.repository.ServiceRepository;
 import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
 import com.barbersaas.weeklyschedule.service.WeeklyScheduleService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,6 +63,7 @@ public class AppointmentService {
     private final WeeklyScheduleService weeklyScheduleService;
     private final AvailableSlotService availableSlotService;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
@@ -73,6 +76,33 @@ public class AppointmentService {
             AvailableSlotService availableSlotService,
             ApplicationEventPublisher eventPublisher) {
 
+        this(
+                appointmentRepository,
+                customerRepository,
+                barberRepository,
+                serviceRepository,
+                appointmentMapper,
+                scheduleBlockService,
+                weeklyScheduleService,
+                availableSlotService,
+                eventPublisher,
+                Clock.systemDefaultZone()
+        );
+    }
+
+    @Autowired
+    public AppointmentService(
+            AppointmentRepository appointmentRepository,
+            CustomerRepository customerRepository,
+            BarberRepository barberRepository,
+            ServiceRepository serviceRepository,
+            AppointmentMapper appointmentMapper,
+            ScheduleBlockService scheduleBlockService,
+            WeeklyScheduleService weeklyScheduleService,
+            AvailableSlotService availableSlotService,
+            ApplicationEventPublisher eventPublisher,
+            Clock clock) {
+
         this.appointmentRepository = appointmentRepository;
         this.customerRepository = customerRepository;
         this.barberRepository = barberRepository;
@@ -82,6 +112,7 @@ public class AppointmentService {
         this.weeklyScheduleService = weeklyScheduleService;
         this.availableSlotService = availableSlotService;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     private BarberEntity findBarber(UUID barberId) {
@@ -165,6 +196,8 @@ public class AppointmentService {
             LocalDateTime appointmentDateTime,
             UUID ignoredAppointmentId) {
 
+        validateBookingWindow(barberId, appointmentDateTime);
+
         int intervalMinutes = getAppointmentIntervalMinutes(
                 appointmentDateTime.getDayOfWeek()
         );
@@ -234,6 +267,21 @@ public class AppointmentService {
         }
     }
 
+    private void validateBookingWindow(
+            UUID barberId,
+            LocalDateTime appointmentDateTime) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!appointmentDateTime.isAfter(now)) {
+            throw new BusinessException("O horário do agendamento deve estar no futuro.");
+        }
+
+        int maxBookingDays = weeklyScheduleService.getMaxBookingDays(barberId);
+        if (appointmentDateTime.toLocalDate()
+                .isAfter(now.toLocalDate().plusDays(maxBookingDays))) {
+            throw new BusinessException("O agendamento excede a janela permitida.");
+        }
+    }
+
     public List<LocalTime> getAvailableSlots(
             UUID barberId,
             LocalDate date) {
@@ -251,13 +299,7 @@ public class AppointmentService {
                 getAppointmentIntervalMinutes(dayOfWeek);
 
         List<LocalTime> allSlots =
-                generateTimeSlots(
-                        schedule.getStartTime(),
-                        schedule.getEndTime(),
-                        intervalMinutes,
-                        schedule.getBreakStartTime(),
-                        schedule.getBreakEndTime()
-                );
+                WeeklyScheduleService.generateFixedSlots(schedule, intervalMinutes);
 
         LocalDateTime startOfDay =
                 date.atStartOfDay();
@@ -361,13 +403,7 @@ public class AppointmentService {
                 );
 
         List<LocalTime> allSlots =
-                generateTimeSlots(
-                        schedule.getStartTime(),
-                        schedule.getEndTime(),
-                        intervalMinutes,
-                        schedule.getBreakStartTime(),
-                        schedule.getBreakEndTime()
-                );
+                WeeklyScheduleService.generateFixedSlots(schedule, intervalMinutes);
 
         LocalDateTime startOfDay =
                 date.atStartOfDay();
@@ -548,88 +584,7 @@ public class AppointmentService {
         return 30;
     }
 
-    private List<LocalTime> generateTimeSlots(
-            LocalTime startTime,
-            LocalTime endTime,
-            int intervalMinutes,
-            LocalTime breakStartTime,
-            LocalTime breakEndTime) {
-
-        List<LocalTime> slots =
-                new ArrayList<>();
-
-        /*
-         * Período antes do almoço.
-         *
-         * Exemplo de segunda-feira:
-         * 09:30
-         * 10:10
-         * 10:50
-         * 11:30
-         */
-        LocalTime current =
-                startTime;
-
-        if (breakStartTime != null) {
-
-            while (current.isBefore(
-                    breakStartTime)) {
-
-                slots.add(current);
-
-                current = current.plusMinutes(
-                        intervalMinutes
-                );
-            }
-
-        } else {
-
-            while (!current.isAfter(endTime)) {
-
-                slots.add(current);
-
-                current = current.plusMinutes(
-                        intervalMinutes
-                );
-            }
-
-            return slots;
-        }
-
-        /*
-         * Período depois do almoço.
-         *
-         * IMPORTANTE:
-         * A contagem recomeça exatamente
-         * no horário de retorno do almoço.
-         *
-         * Segunda-feira:
-         * 14:00
-         * 14:40
-         * 15:20
-         * 16:00
-         * 16:40
-         * 17:20
-         * 18:00
-         * 18:40
-         * 19:20
-         * 20:00
-         */
-        current =
-                breakEndTime;
-
-        while (!current.isAfter(endTime)) {
-
-            slots.add(current);
-
-            current = current.plusMinutes(
-                    intervalMinutes
-            );
-        }
-
-        return slots;
-    }
-
+    @Transactional
     public AppointmentResponse create(
             UUID barberId,
             CreateAppointmentRequest request) {
@@ -643,6 +598,7 @@ public class AppointmentService {
         );
     }
 
+    @Transactional
     public PublicAppointmentResponse createPublic(
             UUID barberId,
             CreateAppointmentRequest request) {
@@ -694,7 +650,7 @@ public class AppointmentService {
             );
         }
 
-        return appointmentRepository.save(entity);
+        return saveScheduledAppointment(entity);
     }
 
     private List<ServiceEntity> findServices(List<UUID> serviceIds) {
@@ -763,6 +719,7 @@ public class AppointmentService {
         );
     }
 
+    @Transactional
     public AppointmentResponse update(
             UUID barberId,
             UUID appointmentId,
@@ -804,10 +761,7 @@ public class AppointmentService {
                 totalPrice(services)
         );
 
-        AppointmentEntity updatedEntity =
-                appointmentRepository.save(
-                        appointment
-                );
+        AppointmentEntity updatedEntity = saveScheduledAppointment(appointment);
 
         return appointmentMapper.toResponse(
                 updatedEntity
@@ -851,6 +805,29 @@ public class AppointmentService {
 
         appointment.setStatus(status);
         return appointmentMapper.toResponse(appointmentRepository.save(appointment));
+    }
+
+    public AppointmentEntity saveScheduledAppointment(AppointmentEntity appointment) {
+        try {
+            return appointmentRepository.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException exception) {
+            if (isScheduledSlotConflict(exception)) {
+                throw new BusinessException("Horário indisponível.", exception);
+            }
+            throw exception;
+        }
+    }
+
+    private boolean isScheduledSlotConflict(DataIntegrityViolationException exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current.getMessage() != null
+                    && current.getMessage().contains("ux_appointments_scheduled_slot")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     @Transactional

@@ -244,7 +244,7 @@ class AvailabilityInterestServiceTest {
                         APPOINTMENT_ID
                 );
         verify(availableSlotRepository).save(slot);
-        verify(appointmentRepository).save(appointment);
+        verify(appointmentService).saveScheduledAppointment(appointment);
         verify(availabilityInterestRepository).save(interest);
     }
 

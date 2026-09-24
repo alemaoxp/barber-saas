@@ -128,6 +128,13 @@ public class WeeklyScheduleService {
                     "Horário dentro do intervalo."
             );
         }
+
+        int intervalMinutes = appointmentDateTime.getDayOfWeek() == DayOfWeek.MONDAY
+                ? 40
+                : 30;
+        if (!generateFixedSlots(schedule, intervalMinutes).contains(appointmentTime)) {
+            throw new BusinessException("Horário fora da grade fixa.");
+        }
     }
 
     public WeeklyScheduleEntity getWorkingSchedule(
@@ -156,6 +163,32 @@ public class WeeklyScheduleService {
                 barberSchedule.getId(),
                 dayOfWeek
         );
+    }
+
+    public int getMaxBookingDays(UUID barberId) {
+        return findBarberSchedule(barberId).getMaxBookingDays();
+    }
+
+    public static List<LocalTime> generateFixedSlots(
+            WeeklyScheduleEntity schedule,
+            int intervalMinutes) {
+        List<LocalTime> slots = new ArrayList<>();
+        LocalTime current = schedule.getStartTime();
+
+        if (schedule.getBreakStartTime() != null) {
+            while (current.isBefore(schedule.getBreakStartTime())) {
+                slots.add(current);
+                current = current.plusMinutes(intervalMinutes);
+            }
+            current = schedule.getBreakEndTime();
+        }
+
+        while (!current.isAfter(schedule.getEndTime())) {
+            slots.add(current);
+            current = current.plusMinutes(intervalMinutes);
+        }
+
+        return slots;
     }
 
     private BarberScheduleEntity findBarberSchedule(UUID barberId) {
