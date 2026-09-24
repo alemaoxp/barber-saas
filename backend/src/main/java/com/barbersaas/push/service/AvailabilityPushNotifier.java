@@ -65,8 +65,9 @@ public class AvailabilityPushNotifier {
                         interest.getId(),
                         event.availableSlotId());
             } catch (RuntimeException exception) {
-                LOGGER.warn("Não foi possível alertar o cliente {} sobre a vaga {}.",
-                        interest.getCustomer().getId(), event.availableDateTime(), exception);
+                LOGGER.warn("Não foi possível alertar o cliente {} sobre a vaga {}: {}.",
+                        interest.getCustomer().getId(), event.availableDateTime(),
+                        PushTestService.safeDiagnosticMessage(exception));
             }
         }
     }
