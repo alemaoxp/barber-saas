@@ -13,6 +13,7 @@ import com.barbersaas.weeklyschedule.entity.WeeklyScheduleEntity;
 import com.barbersaas.weeklyschedule.repository.WeeklyScheduleRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Component
+@Profile("local")
 class DevelopmentBarbershopSeed implements ApplicationRunner {
     static final UUID JHOW_CORTES_ID = UUID.fromString("9a5b3e91-cb71-4d77-a9d2-e1b35f4e2101");
     static final UUID DEVELOPMENT_BARBER_ID = UUID.fromString("3700633c-35f1-4ab9-af18-c60f8eb23b45");

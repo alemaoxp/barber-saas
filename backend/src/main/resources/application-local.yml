@@ -1,0 +1,42 @@
+spring:
+  config:
+    import: optional:file:.env.local[.properties]
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/barberdb
+    username: barber
+    password: barber123
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        use_sql_comments: true
+
+app:
+  cors:
+    allowed-origin-patterns: http://localhost:*,http://127.0.0.1:*
+
+# Development-only Web Push probe. Never enable these endpoints in production.
+push:
+  test:
+    enabled: ${PUSH_TEST_ENABLED:false}
+    vapid-public-key: ${PUSH_TEST_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${PUSH_TEST_VAPID_PRIVATE_KEY:}
+    vapid-subject: ${PUSH_TEST_VAPID_SUBJECT:mailto:dev@localhost}
+
+admin:
+  auth:
+    session-duration-days: ${ADMIN_SESSION_DURATION_DAYS:30}
+    dev-email: ${ADMIN_DEV_EMAIL:}
+    dev-password: ${ADMIN_DEV_PASSWORD:}
+    dev-name: ${ADMIN_DEV_NAME:Jhow}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

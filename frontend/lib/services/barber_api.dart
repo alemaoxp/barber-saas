@@ -13,7 +13,10 @@ import '../features/admin/more/weekly_schedule_models.dart';
 import '../features/admin/more/schedule_block_models.dart';
 import 'push_test_client.dart';
 
-const apiBaseUrl = 'http://localhost:8080';
+const apiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'http://localhost:8080',
+);
 const barberId = '3700633c-35f1-4ab9-af18-c60f8eb23b45';
 
 class BarberApiException implements Exception {
