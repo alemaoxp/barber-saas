@@ -2,11 +2,13 @@ package com.barbersaas.appointments.migration;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@Profile("local")
 public class LegacyAppointmentServiceMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;

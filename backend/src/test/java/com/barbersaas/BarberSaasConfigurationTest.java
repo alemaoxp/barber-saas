@@ -42,7 +42,8 @@ class BarberSaasConfigurationTest {
         assertTrue(local.contains("optional:file:.env.local[.properties]"));
         assertTrue(local.contains("http://localhost:*"));
         assertTrue(local.contains("PUSH_TEST_ENABLED"));
-        assertTrue(local.contains("ddl-auto: update"));
+        assertTrue(local.contains("ddl-auto: validate"));
+        assertTrue(local.contains("baseline-on-migrate: false"));
         assertTrue(local.contains("org.hibernate.SQL: DEBUG"));
         assertTrue(local.contains("BasicBinder: TRACE"));
     }

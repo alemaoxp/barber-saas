@@ -10,12 +10,16 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         show_sql: true
         format_sql: true
         use_sql_comments: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
 
 app:
   cors:
